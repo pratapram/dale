@@ -125,8 +125,8 @@ uv run --env-file .env --extra agent python -m eval.run_trials uc1 anthropic:cla
 Use cases: `uc1` (inventory reconciliation), `uc2` (log sessionization / `window_flag`), `uc3`
 (churn / feature usage, alternative pipeline), `uc4` (org permission inheritance /
 `graph_walk_resolve`). Gemini models are expected to fail entirely — `filter_where`'s recursive
-predicate schema breaks Gemini's function-calling format (`objections.md` #16's sibling issue,
-tracked at `pratapram/_dale#1`) — this is a known, already-diagnosed limitation, not a harness bug,
+predicate schema breaks Gemini's function-calling format (tracked in issue #1) — this is a known,
+already-diagnosed limitation, not a harness bug,
 if you point a `google:*` model at any use case here.
 
 ## Validated so far
