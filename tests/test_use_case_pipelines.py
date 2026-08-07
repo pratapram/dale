@@ -19,6 +19,8 @@ import itertools
 import json
 from pathlib import Path
 
+import pytest
+
 import dale
 
 DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
@@ -404,6 +406,8 @@ def _run_diff_route(registry):
 
 
 def test_uc3_large_checker_accepts_dict_diff_shaped_answer():
+    # eval.use_cases imports dale.agent, which needs the `agent` extra.
+    pytest.importorskip("pydantic_ai")
     from eval.use_cases import check_uc3_large
 
     registry = _uc3_large_registry()
@@ -415,6 +419,8 @@ def test_uc3_large_checker_accepts_dict_diff_shaped_answer():
 
 
 def test_uc3_large_checker_still_rejects_a_wrong_answer():
+    # eval.use_cases imports dale.agent, which needs the `agent` extra.
+    pytest.importorskip("pydantic_ai")
     from eval.use_cases import _UC3_LARGE_EXPECTED, check_uc3_large
 
     registry = _uc3_large_registry()
@@ -438,6 +444,8 @@ def test_uc3_large_checker_still_rejects_a_wrong_answer():
 
 def test_uc3_checker_accepts_dict_diff_shaped_answer(registry):
     """Same false negative existed in check_uc3 against the real fixture."""
+    # eval.use_cases imports dale.agent, which needs the `agent` extra.
+    pytest.importorskip("pydantic_ai")
     from eval.use_cases import _UC3_EXPECTED, check_uc3
 
     registry.create(

@@ -303,20 +303,15 @@ larger than the input.
 
 ```bash
 uv sync --extra dev --extra agent && uv run pytest -q   # 366 passed, 1 deselected
-uv sync --extra dev && uv run pytest -q                 # core only — 3 failed, 209 passed, 4 skipped
+uv sync --extra dev && uv run pytest -q                 # core only — 209 passed, 7 skipped
 ```
 
-Measured on Python 3.12 at commit `b33b198`. Both lines start with `uv sync`, deliberately: `uv
-sync` *replaces* the environment's extras, so it is the only way to reach a genuinely
+Both lines start with `uv sync`, deliberately: `uv sync` *replaces* the environment's extras, so it
+is the only way to reach a genuinely
 `pydantic_ai`-free env — `uv run --extra dev` alone will not remove a `pydantic_ai` an earlier sync
 installed, and reports the green 366 instead. That also means the second line uninstalls the agent
 extra; re-run the first to get it back. Name both extras when you want both: `uv sync --extra agent`
 on its own drops `pytest`.
-
-**Known issue:** the core-only run is red. `tests/test_use_case_pipelines.py` imports `dale.agent`
-without the `pytest.importorskip` guard `tests/test_agent.py` has, so its three tests fail on
-`ModuleNotFoundError: No module named 'pydantic_ai'` instead of skipping. Install the `agent` extra
-for a green run.
 
 Live tests that hit a real provider are deselected two ways — `addopts = "-m 'not live'"` in
 `pyproject.toml`, plus a `DALE_LIVE_TESTS` gate inside the test file — so a bare `pytest` never
@@ -328,8 +323,10 @@ Tests are per module (`test_registry`, `test_grammar`, `test_errors`, `test_prim
 `test_flatten_json`, `test_priority_reduce`, `test_harness_usage`, `test_agent`, `test_agent_live`)
 with small isolated fixtures. `test_use_case_pipelines.py` is the deliberate exception: it runs the
 `DESIGN.md` §3 use cases end to end against `examples/data/`, asserting independently-computed
-ground truth. `test_agent.py` skips itself without the `agent` extra, and drives the full tool-call
-loop against PydanticAI's offline models — no key needed for structural verification.
+ground truth. Three of its tests reach `dale.agent` through the eval harness and skip themselves
+without the `agent` extra; the rest are core-only and always run. `test_agent.py` skips itself the
+same way, and drives the full tool-call loop against PydanticAI's offline models — no key needed for
+structural verification.
 
 ## Docs
 
