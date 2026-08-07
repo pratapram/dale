@@ -287,7 +287,7 @@ represent recursive schemas; see `examples/04`'s docstring.)
 | `06_hello_world_file.py` | File-to-file: the model calls `load_csv` and `export_handle` against virtual names, never constructing a real path on either end. Prints each step live |
 | `07_export_to_file.py` | The write half of `06` on its own: results go to disk via `export_handle`, never back through the model's context |
 | `08_json_flatten.py` | No key. `load_json` + `flatten_json` over a real GitHub issues snapshot — one row per label, issues with no labels contributing zero rows |
-| `09_license_reconciliation.py` | DALE's original motivating problem, solved by a real LLM: per-tier eligibility lists resolved via `priority_reduce`, then `dict_diff`'d against the previous hour |
+| `09_license_reconciliation.py` | Per-tier eligibility lists reduced to one tier per user via `priority_reduce`, then `dict_diff`'d against the previous hour to report joins, leaves, and tier changes |
 | `10_named_handle_referencing.py` | Three named datasets referred to by name in the task prompt; the model chains `index_by` + `join_lookup` twice |
 
 ```bash
