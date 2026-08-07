@@ -154,12 +154,21 @@ round trip.
 [1] Intent: keep only Engineering staff
     Action: engineering_people = people.filter_where(predicate="department == 'Engineering'")
     Result: ok (<0.1 ms)
+    Registry State:
+      Handle                Type  Size  Memory  Description
+      --------------------  ----  ----  ------  -----------
+      people                list  3     162 B   employee roster with name, department, and age
+      engineering_people *  list  2     114 B   people in Engineering
 ```
 
 The `Action` line is a human-readable representation of the JSON above — a rendering for review, not
-source code, and nothing like it is ever executed. A different model might reach the same answer
-another way (`group_by` on `department`, then read the bucket), but whatever it picks comes from the
-seventeen primitives below and nothing else.
+source code, and nothing like it is ever executed. The registry state under it is the whole of what
+the model knows about your data after the call: names, kinds, sizes, and the descriptions you wrote.
+Not one row of `people` appears there, and none was ever in the model's context — `*` just marks the
+handle this step created.
+
+A different model might reach the same answer another way (`group_by` on `department`, then read the
+bucket), but whatever it picks comes from the seventeen primitives below and nothing else.
 
 Needs `uv sync --extra agent` and one of `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` /
 `MOONSHOTAI_API_KEY` / `DEEPSEEK_API_KEY` / `ALIBABA_API_KEY`; `pick_model()` takes the first it
