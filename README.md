@@ -53,12 +53,10 @@ Anthropic account. Interfaces may still change. Issues: https://github.com/prata
 ## Install
 
 ```bash
-pip install "dale[agent]"    # core + the LLM-orchestration layer
-pip install dale             # core only: primitives, no LLM, no network, no credentials
+pip install "dale[agent]"
 ```
 
-Requires Python 3.10+. Core DALE depends only on `pydantic>=2.6`; the `agent` extra adds
-`pydantic-ai`. The Quick start below needs the `agent` extra.
+Requires Python 3.10+.
 
 To run the examples and tests, clone instead — they aren't shipped in the wheel:
 

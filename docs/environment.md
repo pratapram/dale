@@ -6,12 +6,19 @@ live connectors, no checkpoint/resume — both deliberate). This
 page is the checklist of preconditions, not a tutorial — see the README's Quick start and
 [`examples/`](../examples/) for usage.
 
-**Runtime.** Python 3.10+. Core `dale` needs only `pydantic>=2.6`. LLM orchestration
-([`dale.agent`](agent.md)) additionally needs the `agent` extra (`pydantic-ai>=0.4`,
-`uv sync --extra agent` or `pip install -e ".[agent]"`) — without it, core DALE has **zero network
-dependency and needs no credentials at all**, a real property, not just an omission
-([`DESIGN.md`](../DESIGN.md)'s Build-Time Extensibility section states this explicitly: no live
-connectors means no network access is needed in the common case).
+**Runtime.** Python 3.10+. `pip install "dale[agent]"` is the normal install.
+
+**`pip install dale` — core only, for a different agent loop.** If you are driving DALE from the
+OpenAI SDK, LangChain, or your own loop rather than [PydanticAI](https://ai.pydantic.dev/)'s, the
+core install gives you the whole engine — all 17 primitives, the registry, the declarative grammar,
+cost estimation, `register_primitive` — without the provider SDKs. That is **6 packages and 8 MB**,
+against **103 packages and 103 MB** for the `agent` extra, which pulls the Anthropic, OpenAI and
+Google SDKs plus a full OpenTelemetry stack. Every primitive's parameters are a pydantic model, so
+`dale.get_primitive("filter_where").param_schema.model_json_schema()` gives you a tool schema for
+any framework. Core `dale` needs only `pydantic>=2.6`, and has **zero network dependency and needs
+no credentials at all** — a real property, not just an omission ([`DESIGN.md`](../DESIGN.md)'s
+Build-Time Extensibility section states this explicitly: no live connectors means no network access
+is needed in the common case).
 
 **Filesystem.** Local files only — `load_csv` and `load_json` are the built loaders today
 (`load_jsonl`/`load_parquet` are unbuilt; whenever they land, the same local-only constraint
