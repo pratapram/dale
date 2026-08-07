@@ -7,7 +7,7 @@ only handle metadata (dale.agent.registry_state_summary) and whatever a
 tool call explicitly returns; it solves the task entirely by choosing
 primitives and structured parameters, never by writing code.
 
-See examples/06_hello_world_file.py for the file-backed counterpart, and
+See examples/02_hello_world_file.py for the file-backed counterpart, and
 examples/04_llm_orchestrated.py for a longer, multi-step version of this
 same idea.
 
@@ -15,7 +15,7 @@ Requires: uv sync --extra agent
 Requires: one of ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY (or
           GOOGLE_API_KEY) set — e.g. via .env (see .env.example).
 
-Run:  uv run --env-file .env --extra agent python examples/05_hello_world_memory.py
+Run:  uv run --env-file .env --extra agent python examples/01_hello_world_memory.py
 
 DALE_VERBOSITY controls how much prints live as the agent works: "quiet"
 (default) prints nothing but MODEL/TASK/FINAL RESULT; "normal" adds a CALL
@@ -24,7 +24,7 @@ call's full JSON RETURN payload; "raw" adds the literal exchange with the
 model itself (system/user prompt, the model's exact tool-call args before
 DALE strips `intent`, tool returns) interleaved with the human-readable
 trace — e.g.:
-  DALE_VERBOSITY=raw uv run --env-file .env --extra agent python examples/05_hello_world_memory.py
+  DALE_VERBOSITY=raw uv run --env-file .env --extra agent python examples/01_hello_world_memory.py
 """
 
 import os

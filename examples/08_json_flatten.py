@@ -10,7 +10,7 @@ issues in this snapshot has any labels; the rest have "labels": [] and
 correctly contribute zero rows to the result — no separate filter step
 needed, see JSON_FEATURE.md / testcases.md for the full design rationale.
 
-Like examples/01-03, this calls primitives directly (no LLM, no API key
+Like examples/05-07, this calls primitives directly (no LLM, no API key
 needed) — the "LLM" in a real deployment would choose these same primitive
 names and structured arguments; here we call them directly to keep the
 example self-contained and runnable everywhere. examples/04_llm_orchestrated.py

@@ -179,7 +179,7 @@ one-sentence summary. The rows in `engineering` came out of DALE's own primitive
 prose about them, and its wording varies from run to run.
 
 Primitives can also be called directly, with no model involved — `dale.call_primitive(registry,
-name, params)`, same validation and same cost gates. See `examples/01`–`03`.
+name, params)`, same validation and same cost gates. See `examples/05`–`07`.
 
 ## Primitives
 
@@ -274,32 +274,33 @@ for JSON, `flatten_json`'s multi-level `path` support, `load_jsonl`/`load_parque
 
 | Script | Scenario | Demonstrates |
 |---|---|---|
-| `01_filter_sort_compute.py` | A product catalogue with price, cost, and stock status. You want the in-stock items ranked by profit margin. | No LLM required. `filter_where`, `compute_field`, `sort_by`, `peek`, `describe`, `release_handle` |
-| `02_composite_key_join.py` | Two suppliers list overlapping SKUs, so a product is only identified by supplier *and* SKU together. Orders have to be priced against that pair. | No LLM required. `index_by`/`group_by` with multi-field (composite/tuple) keys, then `join_lookup` |
-| `03_cost_estimation_guardrail.py` | 10 records join against 10 tags that all share one key — 100 rows out, against a ceiling of 20. | No LLM required. **Start here for the safety story.** The join is refused *before* it runs, with an exact estimate (`estimated_rows: 100 (threshold: 20)`) and no handle created — then succeeds under an explicit `confirm=True` |
-| `04_llm_orchestrated.py` | The same catalogue as `01`, but the pipeline is described in plain language instead of written out. | An LLM picks the primitives and parameters, never seeing the data and never writing code; each step is watched through the action log |
-| `05_hello_world_memory.py` | An employee roster in memory. How many people are in Engineering, and who are they? | Shortest possible `dale.agent` setup — in-memory data, a one-line task. Start here before `04` |
-| `06_hello_world_file.py` | The same roster arrives as `people.csv`, and the answer has to land in another file. | The model calls `load_csv` and `export_handle` itself, against virtual names — it never sees or builds a real path on either end. Prints each step live |
-| `07_export_to_file.py` | Roster in memory, but the task asks for the result on disk rather than in the answer. | `export_handle` as the final action: DALE writes the rows straight to the file, and the result reports `exported_to` instead of a handle — the content never returns through the model's context |
+| `01_hello_world_memory.py` | An employee roster in memory. How many people are in Engineering, and who are they? | Shortest possible `dale.agent` setup — in-memory data, a one-line task. Start here before `04` |
+| `02_hello_world_file.py` | The same roster arrives as `people.csv`, and the answer has to land in another file. | The model calls `load_csv` and `export_handle` itself, against virtual names — it never sees or builds a real path on either end. Prints each step live |
+| `03_export_to_file.py` | Roster in memory, but the task asks for the result on disk rather than in the answer. | `export_handle` as the final action: DALE writes the rows straight to the file, and the result reports `exported_to` instead of a handle — the content never returns through the model's context |
+| `04_llm_orchestrated.py` | The same catalogue as `05`, but the pipeline is described in plain language instead of written out. | An LLM picks the primitives and parameters, never seeing the data and never writing code; each step is watched through the action log |
+| `05_filter_sort_compute.py` | A product catalogue with price, cost, and stock status. You want the in-stock items ranked by profit margin. | No LLM required. `filter_where`, `compute_field`, `sort_by`, `peek`, `describe`, `release_handle` |
+| `06_composite_key_join.py` | Two suppliers list overlapping SKUs, so a product is only identified by supplier *and* SKU together. Orders have to be priced against that pair. | No LLM required. `index_by`/`group_by` with multi-field (composite/tuple) keys, then `join_lookup` |
+| `07_cost_estimation_guardrail.py` | 10 records join against 10 tags that all share one key — 100 rows out, against a ceiling of 20. | No LLM required. **Start here for the safety story.** The join is refused *before* it runs, with an exact estimate (`estimated_rows: 100 (threshold: 20)`) and no handle created — then succeeds under an explicit `confirm=True` |
 | `08_json_flatten.py` | A real GitHub issues response where each issue carries a nested `labels` array. You want one row per label. | No LLM required. `load_json` + `flatten_json`; issues with no labels contribute zero rows rather than erroring |
 | `09_license_reconciliation.py` | Three per-tier eligibility lists are regenerated hourly. A user can appear on several and must resolve to their highest tier, and you need to know who joined, left, or changed tier since the last run. | `priority_reduce` to collapse each user to one tier (gold beats silver beats bronze), then `dict_diff` against the previous hour |
 | `10_named_handle_referencing.py` | Three datasets registered as `people_list`, `org_list`, and `place_list`, referred to by exactly those names in the task text — no ID for the model to resolve first. | A handle's name *is* its identity; the model chains `index_by` + `join_lookup` twice to attach each Engineering employee's office, then that office's city and capacity |
 
 ```bash
-uv run python examples/01_filter_sort_compute.py
-uv run python examples/02_composite_key_join.py
-uv run python examples/03_cost_estimation_guardrail.py
-uv run python examples/08_json_flatten.py
-
-# the rest need the agent extra + a real API key:
+# start here — needs the agent extra + a real API key:
 uv sync --extra dev --extra agent
 cp .env.example .env   # then fill in your real key(s) — .env is gitignored, .env.example isn't
-uv run --env-file .env --extra agent python examples/05_hello_world_memory.py
+uv run --env-file .env --extra agent python examples/01_hello_world_memory.py
 uv run --env-file .env --extra agent python examples/04_llm_orchestrated.py
+
+# these need no LLM at all:
+uv run python examples/05_filter_sort_compute.py
+uv run python examples/06_composite_key_join.py
+uv run python examples/07_cost_estimation_guardrail.py
+uv run python examples/08_json_flatten.py
 
 # DALE_MODEL forces a provider/model; DALE_VERBOSITY is quiet | normal | debug | raw
 DALE_MODEL="openai:gpt-5.6" DALE_VERBOSITY=debug \
-  uv run --env-file .env --extra agent python examples/06_hello_world_file.py
+  uv run --env-file .env --extra agent python examples/02_hello_world_file.py
 ```
 
 ## Extending the primitive catalog

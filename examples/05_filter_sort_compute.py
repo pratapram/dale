@@ -1,6 +1,6 @@
 """Basic pipeline: load data, filter, compute a derived field, sort, inspect.
 
-Run: uv run python examples/01_filter_sort_compute.py
+Run: uv run python examples/05_filter_sort_compute.py
 
 Demonstrates the core idea: every step is a declarative primitive call, never
 generated code. The "LLM" in a real deployment would be choosing these same

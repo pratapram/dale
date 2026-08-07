@@ -131,7 +131,7 @@ by design; that case stays the job of `max_tool_calls` and `UsageLimits`.
 How the stop *reaches you* depends on how you run the agent. `run_agent` catches it like any other
 run failure and hands back an `AgentRunOutcome(success=False, error=...)`, still printing the
 `Result: Failure` block with its usage and timing lines at non-quiet verbosity. Calling
-`agent.run_sync` directly — as `examples/04`, `06`, `07`, `09` and `10` do — lets it propagate to
+`agent.run_sync` directly — as `examples/02`, `03`, `04`, `09` and `10` do — lets it propagate to
 the caller as a raised exception, so a script taking that route should catch it itself.
 
 ## Verbosity, and `verbosity="raw"`

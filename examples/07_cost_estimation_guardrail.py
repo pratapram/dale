@@ -2,7 +2,7 @@
 configured size limit is refused *before* it runs, with an exact estimate —
 not caught after the fact by an exception.
 
-Run: uv run python examples/03_cost_estimation_guardrail.py
+Run: uv run python examples/07_cost_estimation_guardrail.py
 """
 
 from __future__ import annotations

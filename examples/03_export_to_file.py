@@ -1,6 +1,6 @@
 """Hello World #3: an LLM writing its result straight to a file.
 
-Same task and data as examples/05_hello_world_memory.py, but this time the
+Same task and data as examples/01_hello_world_memory.py, but this time the
 task asks for the result to be written to a file instead of just answered
 in place. The model calls export_handle as its last action — the filtered
 records are written directly to disk by DALE, never passed back through the
@@ -16,14 +16,14 @@ model, which a code-generation/debug-loop approach structurally cannot do.
 
 export_handle resolves `destination` through FileRegistry.register_output —
 a real path the invoker names ahead of time, exactly like load_csv's `file`
-param on the read side (see examples/06_hello_world_file.py) — never a path
+param on the read side (see examples/02_hello_world_file.py) — never a path
 the model constructs itself.
 
 Requires: uv sync --extra agent
 Requires: one of ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY (or
           GOOGLE_API_KEY) set — e.g. via .env (see .env.example).
 
-Run:  uv run --env-file .env --extra agent python examples/07_export_to_file.py
+Run:  uv run --env-file .env --extra agent python examples/03_export_to_file.py
 """
 
 import sys

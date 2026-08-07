@@ -1,10 +1,10 @@
 """Hello World #2: an LLM reading from a file and writing back to one.
 
-Same data as examples/05_hello_world_memory.py, but this time both ends are
+Same data as examples/01_hello_world_memory.py, but this time both ends are
 files, not just the source: the model loads 'people.csv' via load_csv, then
 writes its filtered result straight to another file via export_handle — the
 filtered rows are written to disk by DALE, never passed back through the
-model's own context (objections #12; see examples/07_export_to_file.py for
+model's own context (objections #12; see examples/03_export_to_file.py for
 the same write path starting from in-memory data instead of a file).
 
 The model never sees a real filesystem path on either end — only the
@@ -27,7 +27,7 @@ Requires: uv sync --extra agent
 Requires: one of ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY (or
           GOOGLE_API_KEY) set — e.g. via .env (see .env.example).
 
-Run:  uv run --env-file .env --extra agent python examples/06_hello_world_file.py
+Run:  uv run --env-file .env --extra agent python examples/02_hello_world_file.py
 
 Prints each step live as the agent works (dale.agent.Verbosity's "normal"
 level — CALL line, one-line RETURN status, REGISTRY STATE; no raw JSON).

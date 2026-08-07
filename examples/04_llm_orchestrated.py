@@ -32,7 +32,7 @@ Qwen (Alibaba/DashScope), all of which handle it correctly too.
 
 Run:  uv run --env-file .env --extra agent python examples/04_llm_orchestrated.py
 
-Compare this to examples/01_filter_sort_compute.py, which solves the same
+Compare this to examples/05_filter_sort_compute.py, which solves the same
 task by calling the same primitives directly, by hand. Here, nothing but
 the task description and the tool schemas are handed to the model — it
 decides which primitives to call and with what parameters, and states its

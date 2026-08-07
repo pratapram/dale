@@ -1,7 +1,7 @@
 """Composite keys and joins: index_by/group_by with multi-field keys, then
 join_lookup to merge two datasets.
 
-Run: uv run python examples/02_composite_key_join.py
+Run: uv run python examples/06_composite_key_join.py
 """
 
 from __future__ import annotations
