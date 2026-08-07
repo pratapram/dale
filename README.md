@@ -52,20 +52,23 @@ Anthropic account. Interfaces may still change. Issues: https://github.com/prata
 
 ## Install
 
-Requires Python 3.10+. Core DALE depends only on `pydantic>=2.6` — no network access, no
-credentials. The `agent` extra adds `pydantic-ai` for the LLM-orchestration layer.
+```bash
+pip install "dale[agent]"    # core + the LLM-orchestration layer
+pip install dale             # core only: primitives, no LLM, no network, no credentials
+```
+
+Requires Python 3.10+. Core DALE depends only on `pydantic>=2.6`; the `agent` extra adds
+`pydantic-ai`. The Quick start below needs the `agent` extra.
+
+To run the examples and tests, clone instead — they aren't shipped in the wheel:
 
 ```bash
 git clone https://github.com/pratapram/dale
 cd dale
-uv sync --extra dev      # or: pip install -e ".[dev]"
+uv sync --extra dev --extra agent    # or: pip install -e ".[dev,agent]"
 ```
 
-For the LLM examples, add the agent extra: `uv sync --extra agent` (or `pip install -e ".[agent]"`).
-[`uv`](https://docs.astral.sh/uv/) is the project's package manager; pip works everywhere uv is
-shown.
-
-*Not published to PyPI yet — install from source. `pip install dale` will work once it is.*
+[`uv`](https://docs.astral.sh/uv/) is the project's package manager; pip works everywhere uv is shown.
 
 ## Quick start
 
