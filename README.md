@@ -46,7 +46,7 @@ sources** — there are no database or API connectors, deliberately, so somethin
 materialize the data first. And note that evaluation so far is a **preliminary pilot** (N=5, four
 of eight patterns, one dataset size), not a validated success rate.
 
-**Status:** alpha (`0.1.0`). Core engine and a foundational primitive set, with tests, plus a
+**Status:** alpha (`0.1.1`). Core engine and a foundational primitive set, with tests, plus a
 PydanticAI-based agent-integration module (`src/dale/agent/`) verified end-to-end against a live
 Anthropic account. Interfaces may still change. Issues: https://github.com/pratapram/dale/issues
 
