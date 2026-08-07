@@ -272,11 +272,6 @@ for JSON, `flatten_json`'s multi-level `path` support, `load_jsonl`/`load_parque
 
 ## Examples
 
-Scripts **01, 02, 03 and 08 need no LLM** — they call primitives directly, the same way a model
-would. The rest drive a real model and need the `agent` extra plus a key. (Gemini can't run tasks
-that need `filter_where`'s recursive and/or/not predicates — its function-calling format can't
-represent recursive schemas; see `examples/04`'s docstring.)
-
 | Script | Scenario | Demonstrates |
 |---|---|---|
 | `01_filter_sort_compute.py` | A product catalogue with price, cost, and stock status. You want the in-stock items ranked by profit margin. | No LLM required. `filter_where`, `compute_field`, `sort_by`, `peek`, `describe`, `release_handle` |
