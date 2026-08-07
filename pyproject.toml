@@ -1,5 +1,5 @@
 [project]
-name = "dale"
+name = "dale-engine"
 version = "0.1.1"
 description = "Declarative Algorithmic Logic Engine — non-Turing-complete tool primitives for LLM-orchestrated data processing"
 readme = "README.md"

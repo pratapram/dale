@@ -6,9 +6,10 @@ live connectors, no checkpoint/resume — both deliberate). This
 page is the checklist of preconditions, not a tutorial — see the README's Quick start and
 [`examples/`](../examples/) for usage.
 
-**Runtime.** Python 3.10+. `pip install "dale[agent]"` is the normal install.
+**Runtime.** Python 3.10+. `pip install "dale-engine[agent]"` is the normal install (the distribution is
+`dale-engine`; the import is `dale`).
 
-**`pip install dale` — core only, for a different agent loop.** If you are driving DALE from the
+**`pip install dale-engine` — core only, for a different agent loop.** If you are driving DALE from the
 OpenAI SDK, LangChain, or your own loop rather than [PydanticAI](https://ai.pydantic.dev/)'s, the
 core install gives you the whole engine — all 17 primitives, the registry, the declarative grammar,
 cost estimation, `register_primitive` — without the provider SDKs. That is **6 packages and 8 MB**,

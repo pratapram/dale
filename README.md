@@ -53,10 +53,10 @@ Anthropic account. Interfaces may still change. Issues: https://github.com/prata
 ## Install
 
 ```bash
-pip install "dale[agent]"
+pip install "dale-engine[agent]"
 ```
 
-Requires Python 3.10+.
+Requires Python 3.10+. The distribution is `dale-engine`; the import is `dale`.
 
 To run the examples and tests, clone instead — they aren't shipped in the wheel:
 
