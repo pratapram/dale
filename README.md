@@ -277,18 +277,18 @@ would. The rest drive a real model and need the `agent` extra plus a key. (Gemin
 that need `filter_where`'s recursive and/or/not predicates — its function-calling format can't
 represent recursive schemas; see `examples/04`'s docstring.)
 
-| Script | Demonstrates |
-|---|---|
-| `01_filter_sort_compute.py` | No key. `filter_where`, `compute_field`, `sort_by`, `peek`, `describe`, `release_handle` |
-| `02_composite_key_join.py` | No key. `index_by`/`group_by` with multi-field (composite/tuple) keys, `join_lookup` |
-| `03_cost_estimation_guardrail.py` | No key. **Start here for the safety story.** An oversized join is refused *before* it runs, with an exact row-count estimate (`estimated_rows: 100 (threshold: 20)`) and no handle created — then succeeds under an explicit `confirm=True` |
-| `04_llm_orchestrated.py` | **The actual pitch.** An LLM solves `01`'s task from a plain-language description, never seeing the data and never writing code |
-| `05_hello_world_memory.py` | Shortest possible `dale.agent` example — in-memory data, a one-line task. Start here before `04` |
-| `06_hello_world_file.py` | File-to-file: the model calls `load_csv` and `export_handle` against virtual names, never constructing a real path on either end. Prints each step live |
-| `07_export_to_file.py` | The write half of `06` on its own: results go to disk via `export_handle`, never back through the model's context |
-| `08_json_flatten.py` | No key. `load_json` + `flatten_json` over a real GitHub issues snapshot — one row per label, issues with no labels contributing zero rows |
-| `09_license_reconciliation.py` | Per-tier eligibility lists reduced to one tier per user via `priority_reduce`, then `dict_diff`'d against the previous hour to report joins, leaves, and tier changes |
-| `10_named_handle_referencing.py` | Three named datasets referred to by name in the task prompt; the model chains `index_by` + `join_lookup` twice |
+| Script | Scenario | Demonstrates |
+|---|---|---|
+| `01_filter_sort_compute.py` | A product catalogue with price, cost, and stock status. You want the in-stock items ranked by profit margin. | No key. `filter_where`, `compute_field`, `sort_by`, `peek`, `describe`, `release_handle` |
+| `02_composite_key_join.py` | Two suppliers list overlapping SKUs, so a product is only identified by supplier *and* SKU together. Orders have to be priced against that pair. | No key. `index_by`/`group_by` with multi-field (composite/tuple) keys, then `join_lookup` |
+| `03_cost_estimation_guardrail.py` | 10 records join against 10 tags that all share one key — 100 rows out, against a ceiling of 20. | No key. **Start here for the safety story.** The join is refused *before* it runs, with an exact estimate (`estimated_rows: 100 (threshold: 20)`) and no handle created — then succeeds under an explicit `confirm=True` |
+| `04_llm_orchestrated.py` | The same catalogue as `01`, but the pipeline is described in plain language instead of written out. | An LLM picks the primitives and parameters, never seeing the data and never writing code; each step is watched through the action log |
+| `05_hello_world_memory.py` | An employee roster in memory. How many people are in Engineering, and who are they? | Shortest possible `dale.agent` setup — in-memory data, a one-line task. Start here before `04` |
+| `06_hello_world_file.py` | The same roster arrives as `people.csv`, and the answer has to land in another file. | The model calls `load_csv` and `export_handle` itself, against virtual names — it never sees or builds a real path on either end. Prints each step live |
+| `07_export_to_file.py` | Roster in memory, but the task asks for the result on disk rather than in the answer. | `export_handle` as the final action: DALE writes the rows straight to the file, and the result reports `exported_to` instead of a handle — the content never returns through the model's context |
+| `08_json_flatten.py` | A real GitHub issues response where each issue carries a nested `labels` array. You want one row per label. | No key. `load_json` + `flatten_json`; issues with no labels contribute zero rows rather than erroring |
+| `09_license_reconciliation.py` | Three per-tier eligibility lists are regenerated hourly. A user can appear on several and must resolve to their highest tier, and you need to know who joined, left, or changed tier since the last run. | `priority_reduce` to collapse each user to one tier (gold beats silver beats bronze), then `dict_diff` against the previous hour |
+| `10_named_handle_referencing.py` | Three datasets registered as `people_list`, `org_list`, and `place_list`, referred to by exactly those names in the task text — no ID for the model to resolve first. | A handle's name *is* its identity; the model chains `index_by` + `join_lookup` twice to attach each Engineering employee's office, then that office's city and capacity |
 
 ```bash
 uv run python examples/01_filter_sort_compute.py
