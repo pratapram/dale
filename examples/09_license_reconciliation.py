@@ -1,5 +1,5 @@
 """License tier reconciliation — DALE's original motivating problem
-(USECASES.md UC6, testcases.md Test Case 4), solved by a real LLM.
+solved by a real LLM.
 
 Three per-tier eligibility lists are regenerated hourly by an upstream
 system. A user can appear on more than one list and must be resolved to
@@ -10,7 +10,7 @@ removed, and whose tier changed.
 The three tier lists are unioned and tagged with their source tier here, in
 plain Python, before DALE ever sees the data — no union/concat primitive
 exists in the catalog yet, and this kind of mechanical assembly isn't an
-interesting decision for the model to make anyway (objections.md already
+interesting decision for the model to make anyway (DALE already
 treats assembling paginated API responses into one document the same way:
 the invoker's job, not the LLM's). The model's job starts at priority_reduce:
 resolving the tagged candidates to one tier per user, then dict_diff against

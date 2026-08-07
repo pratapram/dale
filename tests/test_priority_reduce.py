@@ -1,4 +1,4 @@
-"""Unit coverage for priority_reduce (testcases.md Test Case 4 — license
+"""Unit coverage for priority_reduce (license
 tier reconciliation, the project's original motivating problem)."""
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
-"""peek/describe — secondary sanity-check tools, not load-bearing (objections
+"""peek/describe — secondary sanity-check tools, not load-bearing (see
 #2: schema is given upfront in the task, not discovered). Hard output caps
-here are a small piece of the deferred strict_privacy mode (objections #12)
+here are a small piece of the deferred strict_privacy mode
 pulled forward now: cheap to do correctly from the start, awkward to retrofit.
 """
 
@@ -27,7 +27,7 @@ _PEEK_MAX_BYTES = 4_096
 handle, any shape, any nesting depth.
 
 Stated in bytes because bytes are what DALE's central claim is actually about
-— the LLM never sees the underlying data (DESIGN.md Section 2, objections.md
+— the LLM never sees the underlying data (DESIGN.md Section 2,
 #2) — and because every count-based cap tried here has failed on a shape
 nobody thought to enumerate. Capping keys let a group_by hand back whole
 buckets (852KB measured on 10,000 rows in 3 regions). Capping records then let
@@ -112,7 +112,7 @@ def _more(count: int, unit: str, *, redact: bool) -> str:
     Count-free is not squeamishness. `shown + "+N more"` is the exact size of
     the thing that was cut, and for a dict handle's buckets that is a
     value -> count pair: peek would hand back the categorical top_k that
-    `describe` deliberately withholds under the same flag (objections.md #12).
+    `describe` deliberately withholds under the same flag.
     The model still learns that it is looking at a partial sample, which is
     the part it needs in order not to be misled; it just doesn't learn the
     number, which is the part that leaks."""
@@ -153,7 +153,7 @@ def _fit(value: Any, budget: int, *, max_items: int, redact: bool) -> tuple[Any,
     whose whole premise is that nothing escapes. Leaves are replaced by their
     type, dict keys *inside* records are not — those are field names, which
     privacy_mode has always shown, since schema is supplied upfront rather
-    than discovered (objections.md #2). A dict *handle's* own keys are data,
+    than discovered. A dict *handle's* own keys are data,
     not schema, and are handled by _sample_dict, which knows the difference."""
     if isinstance(value, dict):
         out: dict[str, Any] = {}
@@ -388,7 +388,7 @@ def describe(registry: DataRegistry, params: DescribeParams) -> PrimitiveOutput:
     """Aggregate statistics for a field: min/max/mean/null-rate for numeric
     fields, distinct-count/top-k for categorical ones. With no field given,
     returns a schema summary (field names and inferred types) instead of
-    individual values. Works fully under `privacy_mode` (objections.md #12)
+    individual values. Works fully under `privacy_mode`
     — the whole point of `describe` is that it's already aggregate, not
     individual-record content — except the categorical top-k *values*
     (real field content, unlike a count) are redacted."""

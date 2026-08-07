@@ -1,4 +1,4 @@
-"""Pre-execution cost estimation (objections #4).
+"""Pre-execution cost estimation.
 
 Because the primitive set is closed and known in advance — not arbitrary
 generated code — the cost of an operation can often be computed or tightly

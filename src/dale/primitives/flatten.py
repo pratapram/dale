@@ -1,9 +1,9 @@
 """flatten_json: explode a nested array field into its own rows, carrying
-selected parent fields down onto each one (DESIGN.md/JSON_FEATURE.md §3.4,
-USECASES.md UC7 — nested/wrapped enterprise API response normalization).
+selected parent fields down onto each one — nested/wrapped enterprise API
+response normalization (DESIGN.md Section 3, Use Case 7).
 
 Deliberately scoped small per a real design discussion, grounded against
-live-fetched real JSON (GitHub/PokeAPI/npm/GeoJSON samples, see testcases.md):
+live-fetched real JSON (GitHub/PokeAPI/npm/GeoJSON samples):
 `path` supports exactly one level today, not arbitrary nesting depth. The
 multi-level case (e.g. Salesforce's Contacts.records inside records) needs a
 `peek()` path extension to discover safely first — building that blind, before

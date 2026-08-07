@@ -8,8 +8,8 @@ Use Case 1 (inventory reconciliation) and Use Case 2 (log sessionization, via
 window_flag) run their DESIGN.md-intended pipelines end to end. Use Case 3
 (churn/feature usage) runs the *alternative* pipeline documented in
 examples/data/README.md, since dict_frequency/set_difference (the intended
-primitives) are still Phase 2 items — window_flag/graph_walk_resolve were
-built to unblock 2 and 4 specifically, not the full Phase 2 primitive set.
+primitives) are not yet built — window_flag/graph_walk_resolve were
+built to unblock 2 and 4 specifically.
 Use Case 4 (org permission inheritance) runs via graph_walk_resolve.
 """
 
@@ -293,11 +293,11 @@ def test_use_case_4_org_permissions(registry):
 
 
 def test_use_case_6_license_reconciliation(registry):
-    """testcases.md Test Case 4 / USECASES.md UC6 — the project's original
+    """The project's original
     motivating problem. The three tier lists are unioned and tagged by the
     invoker in plain Python before DALE ever sees them (no union/concat
     primitive exists yet — same "assembly is the invoker's job" precedent
-    objections.md already applies to paginated API responses); DALE's own
+    DALE already applies to paginated API responses); DALE's own
     job starts at priority_reduce."""
     base = DATA_DIR / "license_reconciliation"
 

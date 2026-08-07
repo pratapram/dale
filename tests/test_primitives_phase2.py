@@ -1,5 +1,5 @@
-"""Unit coverage for the two Phase 2 primitives added to unblock Use Cases 2
-and 4 (ROADMAP.md): window_flag (sliding-window occurrence flagging) and
+"""Unit coverage for the two primitives added to unblock Use Cases 2
+and 4: window_flag (sliding-window occurrence flagging) and
 graph_walk_resolve (single-parent ancestor-chain rule resolution). Small,
 isolated fixtures — not the full sample datasets (see
 tests/test_use_case_pipelines.py for those)."""

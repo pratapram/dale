@@ -1,10 +1,10 @@
-"""Real Phase 3 agent-integration surface — not example-scoped.
+"""The real agent-integration surface — not example-scoped.
 
 Two things live here that examples/04_llm_orchestrated.py used to hand-roll
 locally: the PydanticAI tool-building code (`build_tools`/`build_agent`), and
-the intent/action log (`ActionLog`) that objections #5/#7 call for in place of
+the intent/action log (`ActionLog`) that stands in for
 a resume/checkpoint feature. The log gives a human enough context to see what
-an agent run did after a failure, and gives Phase 4's evaluation a per-step
+an agent run did after a failure, and gives the evaluation harness a per-step
 correctness signal (intent -> tool call -> result), not just a final-answer
 pass/fail.
 

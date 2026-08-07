@@ -1,5 +1,5 @@
 """dict_diff: compare two dict handles keyed the same way and report which
-keys are new, removed, changed, or unchanged (testcases.md Test Case 4 —
+keys are new, removed, changed, or unchanged (
 license tier reconciliation against the previous run's assignment)."""
 
 from __future__ import annotations

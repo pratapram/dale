@@ -4,8 +4,7 @@ Same data as examples/01_hello_world_memory.py, but this time both ends are
 files, not just the source: the model loads 'people.csv' via load_csv, then
 writes its filtered result straight to another file via export_handle — the
 filtered rows are written to disk by DALE, never passed back through the
-model's own context (objections #12; see examples/03_export_to_file.py for
-the same write path starting from in-memory data instead of a file).
+model's own context.
 
 The model never sees a real filesystem path on either end — only the
 virtual names we register — and it calls load_csv/export_handle itself,
@@ -14,7 +13,7 @@ exactly like every other primitive.
 FileRegistry.register(name, path) / register_output(name, path) are the
 invoker-side mappings from LLM-visible virtual names to real locations,
 resolved only inside load_csv/export_handle, never constructed by the model
-(see "The DALE environment" in README.md and objections.md's FileRegistry
+(see "The DALE environment" in docs/environment.md for the FileRegistry
 entry — this mirrors DataRegistry's own opaque-handle treatment of
 in-memory data, applied to file access instead). Note this mapping is
 intentionally just name -> Path today: FileRegistry itself doesn't know or

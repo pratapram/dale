@@ -1,4 +1,4 @@
-"""CLI entry point for Phase 4 trial runs.
+"""CLI entry point for trial runs.
 
 Run:  uv run --env-file .env --extra agent python -m eval.run_trials <use_case> <model> [n]
 e.g.  uv run --env-file .env --extra agent python -m eval.run_trials uc1 anthropic:claude-sonnet-5 10

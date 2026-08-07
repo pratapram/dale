@@ -2,7 +2,7 @@
 
 Closed and non-Turing-complete by construction: comparison predicates, boolean
 combinators, computed fields, and priority orders — structured data, never code.
-See DESIGN.md Section 3.2 / objections.md #1.
+See DESIGN.md Section 3.2.
 """
 
 from __future__ import annotations
@@ -179,7 +179,7 @@ def _match_comparison(record: dict[str, Any], comp: Comparison) -> bool:
 
     if op in _ORDERING_OPS:
         # Missing/None fields cannot be ordered — a structured, catchable error
-        # rather than a Python TypeError leaking through (objections #6).
+        # rather than a Python TypeError leaking through.
         if actual is None:
             raise TypeMismatchError(
                 f"cannot compare missing/None field {comp.field!r} with operator {op!r}",
@@ -201,7 +201,7 @@ def _match_comparison(record: dict[str, Any], comp: Comparison) -> bool:
 
     if op in _STRING_OPS:
         # Bounded literal string ops — approved in place of regex, which was
-        # explicitly rejected for ReDoS risk (objections #1).
+        # explicitly rejected for ReDoS risk.
         if actual is None:
             return False
         actual_str = str(actual)

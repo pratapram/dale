@@ -1,8 +1,7 @@
 """The primitive catalog and the build-time extensibility mechanism.
 
 Built-in primitives register via the same `@primitive(...)` decorator /
-`register_primitive()` call a third-party developer would use later
-(objections #11) — there is no separate "built-in" code path. This is what
+`register_primitive()` call a third-party developer would use later — there is no separate "built-in" code path. This is what
 makes concrete the principle that the LLM's action space grows only in size,
 never in kind: the catalog can grow, but every entry is developer-authored,
 reviewed Python registered ahead of time, never chosen or imported by the LLM
@@ -50,7 +49,7 @@ class PrimitiveSpec(BaseModel):
     bounded_by_input: bool = False
     """True for primitives whose output is provably <= input size
     (filter_where, compute_field, sort_by) — documented as safe by
-    construction rather than silently missing an estimator (objections #4)."""
+    construction rather than silently missing an estimator."""
     creates_handle: bool = False
     """True for primitives whose PrimitiveOutput.handle is a newly created
     handle (as opposed to peek/describe, which return via `result`, or
@@ -93,15 +92,15 @@ def primitive(
     creates_handle: bool = False,
 ) -> Callable[[PrimitiveFn], PrimitiveFn]:
     """Decorator sugar over register_primitive — identical usage for built-ins
-    and for a developer's own `register_primitive` calls (objections #11).
+    and for a developer's own `register_primitive` calls.
 
     Writing one? The obligation that is easy to miss: validate every
     assumption you make about a handle you did not create — element type,
     field presence, value shape — and raise a typed `DaleError` naming what
     was violated. Anything you dereference without checking becomes a bare
     Python exception, which `dispatch` sanitizes into a content-free
-    `INTERNAL_ERROR` the model cannot act on. See principles.md, "Any
-    `INTERNAL_ERROR` Is a Missing Precondition", and reuse the shared checks
+    `INTERNAL_ERROR` the model cannot act on. An `INTERNAL_ERROR` always means a missing
+    precondition, and reuse the shared checks
     in `dale/keys.py` rather than hand-rolling them."""
 
     def deco(fn: PrimitiveFn) -> PrimitiveFn:

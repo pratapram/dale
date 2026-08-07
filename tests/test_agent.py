@@ -440,7 +440,7 @@ def test_an_explicitly_sent_null_value_survives_a_run_plan_step(registry):
     route and dispatch answered `INVALID_PARAMS: predicate.Comparison.value
     Field required` — telling the model to add a field it had already added.
     That is verbatim the malformed filter_where behind the 46-identical-retry
-    pilot failure (ROADMAP.md Phase 4), i.e. a false positive manufactured by
+    pilot failure (the evaluation pilot), i.e. a false positive manufactured by
     DALE's own serialization and then policed by DALE's own repetition limit.
 
     The length-1 case. Its pre-change twin asserted the same thing on the
@@ -729,7 +729,7 @@ def test_each_handle_creating_step_of_a_batch_gets_its_own_auto_inspect(registry
     ]
 
 
-# --- repetition_nudge (ROADMAP.md Tier-1 stuck-detection) ------------------
+# --- repetition_nudge (Tier-1 stuck-detection) ------------------
 
 
 def test_repetition_nudge_appears_only_after_threshold_identical_failures(registry):
@@ -862,7 +862,7 @@ def test_repetition_limit_terminates_on_the_nth_identical_failure(registry):
 
 
 def test_repetition_limit_records_the_killing_call_before_raising(registry):
-    """The ActionLog stands in for a resume/checkpoint feature (objections #5),
+    """The ActionLog stands in for a resume/checkpoint feature,
     so the call that ended the run must be *in* it — losing it would delete
     the single entry a post-mortem most needs."""
     log = ActionLog()
@@ -934,7 +934,7 @@ def test_run_plan_terminating_mid_batch_keeps_the_steps_that_already_ran(registr
     """Raising out of step 3 discards run_plan's *return value* — the partial
     results dict the model would normally have seen — but must not discard the
     work steps 1-2 actually did. The ActionLog is what stands in for a
-    resume/checkpoint feature (objections #5), and the handles are real entries
+    resume/checkpoint feature, and the handles are real entries
     in a real registry; both outlive the call that was in flight, exactly as
     they would if the run had ended on a standalone call instead.
 
@@ -2002,7 +2002,7 @@ def test_raw_verbosity_prints_the_models_own_tool_call_args_before_stripping(
 
 
 def test_a_failing_middle_step_banks_earlier_work_and_skips_later_steps(registry):
-    """principles.md's "Never Waste a Turn", now the universal path rather than
+    """"never waste a turn", now the universal path rather than
     run_plan's special case. Extends the older stop-at-first-failure test with
     the two things it didn't check: that step 1's own *result* is still in the
     payload the model gets back, and that its handle is materializable — not

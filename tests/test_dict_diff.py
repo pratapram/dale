@@ -1,4 +1,4 @@
-"""Unit coverage for dict_diff (testcases.md Test Case 4 — diffing a
+"""Unit coverage for dict_diff (diffing a
 resolved license tier assignment against the previous run's)."""
 
 from __future__ import annotations

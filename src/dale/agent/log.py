@@ -1,8 +1,8 @@
 """The intent/action log — DALE's audit trail, and how a run renders.
 
-`ActionLog` is what objections #5/#7 call for in place of a resume/checkpoint
+`ActionLog` stands in for a resume/checkpoint
 feature: on failure a human reads it to see what a run did, without needing
-full registry-state serialization. It is also the artifact Phase 4's evaluation
+full registry-state serialization. It is also the artifact the evaluation
 compares against an expected call sequence, for per-step rather than only
 end-to-end correctness.
 
@@ -151,9 +151,9 @@ class ActionLogEntry(BaseModel):
 class ActionLog(BaseModel):
     """Append-only (intent -> tool call -> result) trace of one agent run.
 
-    In place of a resume/checkpoint feature (objections #5): on failure, a
+    In place of a resume/checkpoint feature: on failure, a
     human reads this to see what happened without needing full registry-state
-    serialization. Also the artifact Phase 4's evaluation compares against an
+    serialization. Also the artifact the evaluation compares against an
     expected call sequence for per-step (not just end-to-end) correctness.
     """
 

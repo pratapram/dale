@@ -8,7 +8,7 @@ model's own context. The model's structured output (dale.agent.DaleResult)
 then reports `exported_to`, not `handle`, and its `note` never contains the
 actual row content, only a summary.
 
-This is objections.md #12's export_handle primitive, the file-writing half
+This is the export_handle primitive, the file-writing half
 of DALE's strict-privacy design: intermediate steps already never let the
 LLM author data content, and export_handle closes the same gap at final
 delivery — a task can complete with zero real data values ever reaching the

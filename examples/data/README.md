@@ -6,12 +6,11 @@ live-agent runs, not toy placeholder rows — and, as of `window_flag`/`graph_wa
 now also fully wired into DALE's own primitive pipelines with committed regression tests, not just
 data sitting alongside the engine. Each dataset has deliberate edge cases baked in; a correct
 pipeline has to actually handle them, not just run happy-path logic. All files are CSV, since
-`load_csv` is currently the only built loader (`load_json`/`load_jsonl` are Phase 2 items — see
-`ROADMAP.md`).
+`load_csv` is currently the only built loader (`load_json` is built too; `load_jsonl` is planned).
 
 Ground-truth results below were computed with a plain reference script (or, where noted, by direct
-primitive calls through `dale.call_primitive`) — independent of any LLM — following Phase 4's
-"independently-computed ground truth" requirement (`ROADMAP.md`).
+primitive calls through `dale.call_primitive`) — independent of any LLM — following the evaluation plan's
+"independently-computed ground truth" requirement .
 
 ## 1. Multi-Source Inventory & Price Reconciliation — `01_inventory_reconciliation/`
 
@@ -92,7 +91,7 @@ plus the `asmith` success at `09:17:05`), and the 4 threshold-crossing fails for
 
 **Scenario** (DESIGN.md Use Case 3): find active subscribers with zero product usage.
 **Intended pipeline** (DESIGN.md): `index_by` (subscriptions) → `dict_frequency` (event counts) →
-`set_difference` → `sort_by`. `dict_frequency`/`set_difference` are Phase 2 items, not yet built.
+`set_difference` → `sort_by`. `dict_frequency`/`set_difference` are not yet built.
 **Currently-runnable alternative pipeline**, using only what exists today: `group_by(feature_events,
 account_id)` → `join_lookup(active_subscriptions, grouped_events, how="left")` → `filter_where`
 (matched field `== None`) isolates accounts with no matching event bucket. Verified by direct
@@ -169,14 +168,14 @@ E015  {'billing_system': 'Allow'}
 ## `flatten_json` regression fixture — `json_flatten_github_issues/`
 
 Not one of DESIGN.md's numbered use cases — a smaller, `flatten_json`-specific fixture (UC7's
-own scenario needs multi-level nesting `flatten_json` doesn't support yet; see `USECASES.md`).
+own scenario needs multi-level nesting `flatten_json` doesn't support yet).
 Real data, not synthetic: fetched live from `api.github.com/repos/pandas-dev/pandas/issues`
 during design, trimmed down to `number`/`title`/`labels` (dropped the `*_url` fields, `user`
 object, etc. — not relevant to this fixture) with every remaining value exactly as fetched, no
 edits to the real content.
 
 **Scenario:** for each issue, one row per label it has, with the issue number/title carried onto
-each row — the worked example `flatten_json`'s design was built backward from (see `testcases.md`).
+each row — the worked example `flatten_json`'s design was built backward from.
 **Pipeline:** `load_json` → `flatten_json(path=["labels"], carry_fields=["number", "title"])`.
 
 | File | Records | Schema |
@@ -198,14 +197,14 @@ truth.
 |---|---|---|---|
 | 1 | Inventory reconciliation | Yes | Intended pipeline, no gaps |
 | 2 | Log sessionization | Yes | Via `window_flag`, built for this use case |
-| 3 | Churn / feature usage | Yes, via an alternative pipeline | `dict_frequency`/`set_difference` (Phase 2, still unbuilt) is the *intended* pipeline; the working alternative uses `group_by`+`join_lookup`+`filter_where` instead |
+| 3 | Churn / feature usage | Yes, via an alternative pipeline | `dict_frequency`/`set_difference` (still unbuilt) is the *intended* pipeline; the working alternative uses `group_by`+`join_lookup`+`filter_where` instead |
 | 4 | Org permission inheritance | Yes | Via `graph_walk_resolve`, built for this use case — general `graph_bfs`/`graph_dfs` were not needed |
 
 Use Case 1 remains the simplest candidate for a live-agent run (no predicate-heavy or newly-built
 primitives involved). Use Cases 2 and 4 are the more interesting live-agent tests now that
 `window_flag`/`graph_walk_resolve` exist — they require the model to correctly select and
 parameterize a primitive it's likely seen fewer analogous examples of during training than
-`filter_where`/`sort_by`, which is exactly the kind of orchestration-correctness question Phase 4 is
+`filter_where`/`sort_by`, which is exactly the kind of orchestration-correctness question the evaluation is
 for. Use Case 3's alternative pipeline remains a good test of whether the agent can improvise a
 join-based workaround rather than reaching for the "obvious" (but unbuilt) frequency/set-difference
 approach.

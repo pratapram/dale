@@ -8,7 +8,7 @@ is a trimmed, live-fetched snapshot of real GitHub issues from pandas-dev/pandas
 (number/title/labels only — see examples/data/README.md). Only one of the 8
 issues in this snapshot has any labels; the rest have "labels": [] and
 correctly contribute zero rows to the result — no separate filter step
-needed, see JSON_FEATURE.md / testcases.md for the full design rationale.
+needed.
 
 Like examples/05-07, this calls primitives directly (no LLM, no API key
 needed) — the "LLM" in a real deployment would choose these same primitive

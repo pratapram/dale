@@ -1,4 +1,4 @@
-"""Per-use-case setup/task/checker triples for the Phase 4 harness, built on
+"""Per-use-case setup/task/checker triples for the evaluation harness, built on
 the DESIGN.md Section 3 sample data (examples/data/) and the same ground truth
 already pinned down as regression tests in tests/test_use_case_pipelines.py.
 
@@ -121,7 +121,7 @@ _UC1_EXPECTED = [
 # datasets excludes it (equally defensible — "only items confirmed in stock").
 # Accept both rather than penalize a model for resolving an ambiguity we
 # introduced — found by a real live trial that produced exactly this second,
-# reasonable interpretation (see TODO.md session notes).
+# reasonable interpretation (a deliberate call, recorded in the project's notes).
 _UC1_EXPECTED_EXCLUDING_UNTRACKED = [t for t in _UC1_EXPECTED if t[0] != "SKU-1020"]
 
 
@@ -180,7 +180,7 @@ def check_uc2(registry: dale.DataRegistry, action_log: ActionLog, final_answer: 
     # descriptive choice (e.g. "cred_stuffing_flag") is not a mistake. Search
     # every boolean-valued field as a flag candidate rather than hardcoding
     # the default name, which caused a real false-failure the first time this
-    # checker ran against live trials (see TODO.md session notes).
+    # checker ran against live trials (a deliberate call, recorded in the project's notes).
     for rows in _alive_lists(registry):
         if "source_ip" not in rows[0]:
             continue

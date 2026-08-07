@@ -28,7 +28,7 @@ from dale.agent.log import ActionLog
 
 class DaleResult(BaseModel):
     """The agent's structured final output — the same "never trust
-    LLM-authored content as the actual data" principle (objections #2/#12)
+    LLM-authored content as the actual data" principle
     applied to the last step of a run, not just the ones in between.
     Exactly one of `handle`/`exported_to` is expected to be set: `handle`
     when the result was left as a handle in the registry (the invoker calls
@@ -186,7 +186,7 @@ class AgentRunOutcome:
     failure. `usage` is populated either way — see TokenUsage on why a failed
     run still reports real cumulative spend. Mirrors eval/harness.py's own
     TrialResult, which established this same success/error split for the same
-    reason (objections #5): a full run failure is a failed run, not a crash."""
+    reason: a full run failure is a failed run, not a crash."""
 
     success: bool
     result: AgentRunResult[DaleResult] | None = None

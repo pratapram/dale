@@ -1,7 +1,5 @@
-"""Composite-key construction shared by index_by/group_by and join_lookup
-(objections #14 — multi-field keys produce a tuple, not a fourth primary
-type), plus the shape checks a primitive owes any handle it did not create
-itself (see principles.md, "Any INTERNAL_ERROR Is a Missing Precondition")."""
+"""Composite-key construction shared by index_by/group_by and join_lookup, plus the shape checks a primitive owes any handle it did not create
+itself (an `INTERNAL_ERROR` always means a missing precondition)."""
 
 from __future__ import annotations
 

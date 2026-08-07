@@ -643,8 +643,7 @@ def test_join_lookup_wrong_index_kind_raises(registry):
 # Regression set for the bug where join_lookup assumed every index value was
 # a record. A priority_reduce index holds bare values, so `if f in matched`
 # raised TypeError, which dispatch sanitized into an unactionable
-# INTERNAL_ERROR -- see principles.md, "Any INTERNAL_ERROR Is a Missing
-# Precondition".
+# INTERNAL_ERROR -- an INTERNAL_ERROR always means a missing precondition.
 
 
 def _usage_marker_index(registry, present_keys, name_suffix="idx"):
@@ -1235,7 +1234,7 @@ def test_invalid_params_raises(registry):
 
 def test_unexpected_exception_sanitized_to_internal_error(registry):
     """A primitive that raises a raw, unexpected exception (not a DaleError)
-    must never leak its original message back to the caller (objections #6)."""
+    must never leak its original message back to the caller."""
 
     class _BrokenParams(BaseModel):
         pass

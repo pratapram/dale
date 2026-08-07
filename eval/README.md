@@ -1,8 +1,8 @@
-# Phase 4 evaluation harness
+# Evaluation harness
 
 Not part of the `dale` package — this project's own research-validation tooling (the same role
 `examples/` plays for demos), built on `dale.agent` directly (no shortcut around real
-`dispatch`/tool-calling). See `ROADMAP.md` Phase 4 for the full evaluation plan this is one piece of.
+`dispatch`/tool-calling). It implements the evaluation design in `DESIGN.md` Section 5.
 
 ## What's here
 
@@ -46,7 +46,7 @@ Not part of the `dale` package — this project's own research-validation toolin
   categorically different: it means a primitive dereferenced something it never validated, so the
   model received `{"message": "primitive execution failed", "details": {}}` and had nothing to act
   on. **Treat every `INTERNAL_ERROR` in a trial as a DALE defect to file, never as a model
-  failure** — see principles.md, "Any `INTERNAL_ERROR` Is a Missing Precondition". One such bug
+  failure** — an `INTERNAL_ERROR` always means a missing precondition. One such bug
   (`join_lookup` on a `priority_reduce` index) was found exactly this way, from a single
   `failure modes: INTERNAL_ERROR=1` line in a `uc3_large` run.
 
@@ -57,7 +57,7 @@ Not part of the `dale` package — this project's own research-validation toolin
   slow-but-working run looks identical to a hung one. Pass `verbose=False` for quiet mode (summary
   only). `TrialSummary.render(show_action_logs=True)` (also the default) prints each trial's full
   action log at `debug=True` — full RETURN payloads, useful for exactly the kind of checker-bug
-  diagnosis Phase 4 has needed before (see `TODO.md`).
+  diagnosis this kind of evaluation needs.
 
   Every call renders as `handle.primitive(args)` (a receiver method call, not a raw params dict);
   handle-creating primitives (`PrimitiveSpec.creates_handle`) require the model to supply a `name`
@@ -66,7 +66,7 @@ Not part of the `dale` package — this project's own research-validation toolin
   see `DESIGN.md` Section 2's Pointer-Based State Management), so a call renders as e.g.
   `in_stock_widgets = products.filter_where(...)` with no separate opaque id to reconcile — the name
   in the CALL line, in `REGISTRY STATE`, and in raw `DaleError`/`dispatch.py` output are all the same
-  string. Full API and rendering-behavior detail lives in `src/dale/agent.py`'s own docstrings
+  string. Full API and rendering-behavior detail lives in `src/dale/agent/`'s own docstrings
   (`ActionLog._render_registry_state`/`_render_entry`, `dale.agent.Verbosity`) rather than duplicated
   here — this file tracks eval-harness-specific behavior, not `dale.agent`'s API.
 
@@ -140,7 +140,11 @@ Structural correctness confirmed two ways, at zero API cost:
    checkers correctly return `True` on genuinely correct data — the harness can actually detect
    success, not just always report failure.
 
-Real trial batches have been run against `anthropic:claude-sonnet-5` — see `TODO.md`'s session
-notes for the first real N=5 results (UC3 80%, UC4 100%; UC1/UC2 interrupted by a billing wall
-before getting a trustworthy N, and separately caught two real checker bugs along the way — not
-model failures, see the same notes) and `ROADMAP.md` Phase 4 for current status per use case.
+Real trial batches have been run against `anthropic:claude-sonnet-5`. The first batch gave a
+usable N=5 for two of the four use cases — **UC3 80% (4/5)** and **UC4 100% (5/5)** — while UC1 and
+UC2 were cut short before reaching a trustworthy N. That run also surfaced two genuine checker bugs
+rather than model failures, both since fixed: UC1's left-join-vs-inner-join task ambiguity, and
+UC2's hardcoded assumption about `window_flag`'s flag-field name.
+
+These are small-N results and are reported as such; the full trial plan (N=10-20 per pattern, at
+multiple dataset sizes) has not been run. Issues #14-#19 track the remaining measurement work.

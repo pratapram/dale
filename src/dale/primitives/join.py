@@ -1,5 +1,5 @@
 """join_lookup: the one primitive in this increment with genuine fan-out risk,
-and therefore the one that needs a real cost estimator (objections #4). Row
+and therefore the one that needs a real cost estimator. Row
 count is estimated *exactly* from the already-built index's bucket sizes,
 before the join runs; byte count is a deliberate over-estimate."""
 

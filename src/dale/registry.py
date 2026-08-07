@@ -1,5 +1,5 @@
 """DataRegistry: host-side storage for native list/dict/set collections,
-referenced by opaque handles. One instance per invocation (objections #5) —
+referenced by opaque handles. One instance per invocation —
 not a global singleton, not shared across sessions, no concurrency to guard
 against (tool calls are strictly sequential).
 """
@@ -39,8 +39,7 @@ class RegistryLimits(BaseModel):
 
 
 class HandleMeta(BaseModel):
-    """Metadata surfaced to the LLM — never the underlying data itself
-    (objections #2). Also what cost estimation (cost.py) reads from.
+    """Metadata surfaced to the LLM — never the underlying data itself. Also what cost estimation (cost.py) reads from.
 
     `handle` is the single identifier — there is no separate internal id.
     It's supplied by the caller at create() time (an LLM tool call or an
@@ -65,7 +64,7 @@ class HandleMeta(BaseModel):
     index_by and priority_reduce both declare value_shape="scalar" while
     holding completely different things, and join_lookup once read that
     field as if it implied "record", crashing on a priority_reduce index
-    (see principles.md, "Any INTERNAL_ERROR Is a Missing Precondition").
+    (an `INTERNAL_ERROR` always means a missing precondition).
 
     Inferred by create() from the same sample it already takes for
     avg_record_bytes, rather than passed in by each producing primitive —
@@ -139,7 +138,7 @@ class DataRegistry:
 
     @property
     def privacy_mode(self) -> bool:
-        """Opt-in strict-privacy flag (default off, objections.md #12 /
+        """Opt-in strict-privacy flag (default off,
         DESIGN.md's Optional Strict-Privacy Mode). When True, `peek`/
         `describe` redact real values (see src/dale/primitives/inspect.py)
         and `dispatch.call_primitive` sanitizes validation-error messages —
@@ -239,7 +238,7 @@ class DataRegistry:
 
     def record_call(self) -> None:
         """Cheap in-process partial mitigation for the resource-governance
-        'runaway loop' concern (objections #4 layer 2). The full OS-level
+        'runaway loop' concern. The full OS-level
         backstop (ulimit/cgroup + agent-loop max_turns) is deferred."""
         self._call_count += 1
         limit = self._limits.max_tool_calls

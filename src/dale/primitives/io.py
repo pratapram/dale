@@ -1,4 +1,4 @@
-"""Local file loading — never a network connector (objections #13), and
+"""Local file loading — never a network connector, and
 never an LLM-constructed path (see FileRegistry in files.py): `file` is a
 virtual name the invoker registered ahead of time, resolved through
 DataRegistry.files rather than accepted as a raw path directly."""
@@ -115,7 +115,7 @@ def load_json(registry: DataRegistry, params: LoadJsonParams) -> PrimitiveOutput
     """Load a JSON file, referenced by an invoker-registered virtual name (not
     a raw path — see FileRegistry), into a new handle. A top-level JSON array
     becomes a list handle, a top-level JSON object becomes a dict handle —
-    JSON is a loading path, not a new handle kind (see JSON_FEATURE.md ¤3.1).
+    JSON is a loading path, not a new handle kind.
     Many enterprise APIs (Salesforce, ServiceNow, Stripe...) wrap their real
     payload in an envelope object, e.g. {"records": [...]}; if the model
     recognizes this shape it can pass remove_envelope=True to unwrap straight

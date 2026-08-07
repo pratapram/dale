@@ -1,4 +1,4 @@
-"""Named/semantic handle referencing (USECASES.md UC8), solved by a real LLM.
+"""Named/semantic handle referencing, solved by a real LLM.
 
 A developer registers three in-memory datasets before running the agent and
 refers to them by name in the task text, the same way they'd name variables
@@ -12,7 +12,7 @@ org_list is a list of {department, office} records, not a raw scalar dict
 (department -> office string) as UC8 was originally drafted — building this
 example surfaced that join_lookup only merges in dict values that are
 themselves records (built via index_by/group_by); a bare key->scalar dict
-isn't a supported join_lookup input today. See USECASES.md UC8 for that
+isn't a supported join_lookup input today. See DESIGN.md for that
 note in full. The model resolves both org_list and place_list to dicts via
 index_by before join_lookup can chain them onto people_list.
 

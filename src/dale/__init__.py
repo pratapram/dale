@@ -3,7 +3,7 @@
 An LLM manipulates in-memory data (list/dict/set, held behind opaque handles
 in a DataRegistry) exclusively through a small, closed set of declarative
 primitives — never by generating or executing code. See DESIGN.md and
-objections.md for the full architecture and design rationale.
+DESIGN.md for the full architecture and design rationale.
 
 Importing this package registers every built-in primitive into the catalog
 (via `dale.primitives`), so `dale.call_primitive(...)` works immediately.

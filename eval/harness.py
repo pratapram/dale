@@ -1,9 +1,9 @@
-"""Phase 4 trial-runner harness (ROADMAP.md Phase 4): runs an LLM agent N
+"""Trial-runner harness: runs an LLM agent N
 times against a use case, checks each run's result against independently-
 computed ground truth by inspecting registry state after the run (never by
 parsing the model's free-text answer — structured-data checking, consistent
 with DALE's own philosophy), and reports success rate, failure-mode
-categorization, and the wasted-turn-rate metric added to Phase 4 this session.
+categorization, and the wasted-turn-rate metric.
 
 Routes every run through dale.agent.build_agent/ActionLog directly — the same
 path examples/04 and a real deployment would use, not a shortcut.
@@ -90,7 +90,7 @@ class TrialSummary:
     @property
     def wasted_turn_rate(self) -> float:
         """Fraction of logged primitive calls that were rejected (status ==
-        "error") — the metric ROADMAP.md Phase 4 added to test whether a
+        "error") — the metric the evaluation pilot added to test whether a
         closed, schema-validated action space produces fewer wasted turns
         from bad emissions than free-form code generation. `cost_gate_exceeded`
         is not counted as wasted — it's a correct safety response to an
@@ -161,7 +161,7 @@ class TrialSummary:
 
     def failure_mode_counts(self) -> Counter:
         """Error codes seen across all trials, most common first — the
-        categorization DESIGN.md's original Phase 2 evaluation plan called for
+        categorization DESIGN.md's evaluation design calls for
         (wrong primitive, malformed predicate, wrong threshold, ...)."""
         counts: Counter = Counter()
         for r in self.results:

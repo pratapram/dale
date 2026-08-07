@@ -167,7 +167,7 @@ def _call_params(params: BaseModel, *, exclude: set[str]) -> dict[str, Any]:
     told to supply a field it had already supplied, so its only available
     repair was to send the identical call again, and DALE ate the value again.
     That is byte-for-byte the malformed `filter_where` behind the 46-identical-
-    retry pilot failure in ROADMAP.md Phase 4 — the failure NullComparison, the
+    retry pilot failure in the evaluation pilot — the failure NullComparison, the
     repetition nudge and `repetition_limit` were all built in response to. Those
     three defenses all sit downstream of this line: with the cause live, the
     kill switch fires on a loop DALE's own serialization created. Worse, the
@@ -294,7 +294,7 @@ def _build_run_plan_tool(
     entry (it doesn't operate on data itself, so it isn't in
     dale.list_primitives() and can't recursively appear as one of its own
     steps). The model's only tool: it submits a sequence of steps, which DALE
-    runs in order in a plain Python loop — see ROADMAP.md's Phase 3
+    runs in order in a plain Python loop — see the design notes
     "Plan/batch tool" entry for the full design rationale this implements.
     Every step goes through `_execute_and_log_step` — the exact same
     dale.call_primitive path, its own real ActionLog entry,
@@ -317,7 +317,7 @@ def _build_run_plan_tool(
 
     Stops at the first step whose result isn't status="ok" (a real error, or
     cost_gate_exceeded) and returns everything completed so far, including
-    the failure — consistent with principles.md's "Never Waste a Turn": a
+    the failure — consistent with "never waste a turn": a
     failed step 3 of 10 shouldn't discard steps 1-2's real results; the
     model sees exactly what happened and decides its next move itself, the
     same as it does today one call at a time.

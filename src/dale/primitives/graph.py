@@ -6,8 +6,8 @@ were built for exactly this consumer — see the comment in grammar.py.
 Deliberately not general BFS/DFS/topological sort: every node has at most one
 parent (an org chart, not an arbitrary graph), so a bounded upward walk per
 node is the whole algorithm — polynomial, no combinatorial-blowup risk
-(ROADMAP.md Phase 2's exclusion rule, same discipline as the regex/ReDoS
-exclusion in objections #1).
+(the same exclusion rule, same discipline as the regex/ReDoS
+exclusion applied to the predicate grammar).
 """
 
 from __future__ import annotations

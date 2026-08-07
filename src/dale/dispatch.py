@@ -1,7 +1,7 @@
 """call_primitive: the single choke point every primitive call goes through —
 now, direct test/dev calls; later, an agent loop. Handles the tool-call limit,
 schema validation, the cost-estimation confirm-gate, and sanitizing any
-unexpected exception before it can leak (objections #6).
+unexpected exception before it can leak.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ def call_primitive(registry: DataRegistry, name: str, params: dict) -> Primitive
             # Strip pydantic's per-error `input`/`ctx` (echoes the caller's
             # own supplied value back verbatim) — keep only field path and
             # error type, consistent with privacy_mode's "no real content in
-            # error messages" guarantee (objections.md #12).
+            # error messages" guarantee.
             redacted = [
                 {"loc": err["loc"], "type": err["type"]} for err in exc.errors()
             ]

@@ -72,7 +72,7 @@ class AgentLoopTerminated(Exception):
 _REPETITION_NUDGE_THRESHOLD = 2
 """How many prior, identical, failed attempts (same primitive, same params,
 status != "ok") trigger a repetition nudge on the next one — i.e. the nudge
-first appears on the 3rd attempt. Matches ROADMAP.md's Tier-1 stuck-detection
+first appears on the 3rd attempt. Matches Tier-1 stuck-detection
 design ("nudge after 2-3 repeats"). Not exposed as a public parameter, same
 as _AUTO_PEEK_N — a threshold worth tuning later from real data, not a
 per-deployment knob yet."""
@@ -88,7 +88,7 @@ diagnostically. At these two values: attempts 1-2 return a plain error, 3-4
 add a repetition_warning, and the 5th terminates.
 
 Why act at all rather than warn indefinitely: the real UC1 pilot failure
-(ROADMAP.md Phase 4) was 46 byte-for-byte identical calls that never recovered
+(the evaluation pilot) was 46 byte-for-byte identical calls that never recovered
 and burned the entire request budget. paper.md Section 3.13 ranks an LLM
 inference call as the most expensive resource tier in the system; spending 41
 more of them re-deriving an answer DALE already has is the sharpest available
@@ -163,7 +163,7 @@ def _count_prior_identical_failures(
     consecutively, so a `peek` or other call interleaved between two
     identical failing attempts still counts them as repetition. This is the
     real, verbatim mechanism behind UC1's 46x-identical-retry pilot failure
-    (ROADMAP.md Phase 4) — a model that keeps resending the same rejected
+    (the evaluation pilot) — a model that keeps resending the same rejected
     call, never varying it."""
     return sum(
         1
@@ -174,7 +174,7 @@ def _count_prior_identical_failures(
 
 def _repetition_nudge_text(primitive: str, payload: dict[str, Any], attempt_number: int) -> str:
     """Quotes DALE's own already-known error back at the model explicitly —
-    Tier 1 of ROADMAP.md's stuck-detection design: DALE already has the
+    Tier 1 of the stuck-detection design: DALE already has the
     theoretical reason (the error itself), so no model reasoning or new
     mechanism is needed, only surfacing what's already known instead of
     letting the model rediscover it by repeating the identical call.
@@ -243,7 +243,7 @@ def _execute_and_log_step(
 ) -> dict:
     """Runs one primitive call through the real dale.call_primitive path,
     splices in peek_at_every_step's auto_inspect and a repetition_nudge
-    (ROADMAP.md's Tier-1 stuck-detection design) where applicable, records it
+    (the Tier-1 stuck-detection design) where applicable, records it
     in the action log, and prints it live at verbosity != "quiet". The single
     place both a normal one-call tool (_make_tool_fn) and run_plan's per-step
     loop go through, so a call arriving as part of a batch is
@@ -317,7 +317,7 @@ def _execute_and_log_step(
 
     # Both terminal checks are deliberately after record() and the live print,
     # never before: the ActionLog is what stands in for a resume/checkpoint
-    # feature (objections #5), so the call that ended the run has to be *in*
+    # feature, so the call that ended the run has to be *in*
     # it — carrying whatever error or repetition_warning explains why — or the
     # post-mortem loses the single most important entry. Terminating first
     # would destroy exactly the evidence this exists to surface.

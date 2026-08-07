@@ -3,7 +3,7 @@ DALE primitive calls — never code, never raw data in its context — and we
 watch it happen via the action log. Examples 01-03 validate the engine in
 isolation; this is the one that shows why that engine exists.
 
-Built on dale.agent (Phase 3's real integration surface, not a one-off demo
+Built on dale.agent (the real integration surface, not a one-off demo
 script) which wraps PydanticAI (DESIGN.md Stream 3's stated target) — the
 same code runs against Anthropic, OpenAI, or Gemini, whichever API key is
 available.
@@ -16,7 +16,7 @@ Optional: DALE_MODEL to force a specific model string, e.g.
           "anthropic:claude-sonnet-5", "openai:gpt-5.6", or
           "google:gemini-3.6-flash".
 
-Note: filter_where's predicate parameter (And/Or/Not, objections.md #1) is a
+Note: filter_where's predicate parameter (And/Or/Not) is a
 recursive schema. Gemini's function-calling format cannot represent
 recursive $ref/$defs schemas at all (a confirmed upstream Gemini API
 limitation, not a pydantic-ai bug — see pydantic/pydantic-ai#1598) — a task

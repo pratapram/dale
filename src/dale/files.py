@@ -5,17 +5,17 @@ names to real local filesystem paths.
 directly — Path(path) would open whatever it was given, bounded only by the
 OS-level file permissions of the running process. That's an open-ended local
 file *read* primitive with no restriction, structurally the same shape of
-problem objections.md #1 already ruled out for code ("a condition as a string
+problem the grammar already rules out for code ("a condition as a string
 is eval() with extra steps"), just pointed at the filesystem instead.
 
 FileRegistry closes it the same way DataRegistry already closes the
-equivalent problem for in-memory data (objections #2): the LLM never sees or
+equivalent problem for in-memory data: the LLM never sees or
 constructs a real path, only picks among names the invoker explicitly
-registered for this session. See objections.md's FileRegistry entry for the
+registered for this session. See docs/environment.md for the
 full design rationale.
 
 The write side (`register_output`/`resolve_output`) is the symmetric
-mechanism for `export_handle` (objections #12) — a *destination* an invoker
+mechanism for `export_handle` — a *destination* an invoker
 names ahead of time, never a path the LLM constructs. Kept as a separate
 name->Path map from the read side rather than reusing `_files`: registering
 a path as writable is a materially different trust decision than registering

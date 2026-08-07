@@ -1,5 +1,5 @@
-"""Unit + integration coverage for flatten_json (DESIGN.md/JSON_FEATURE.md
-§3.4, USECASES.md UC7). Test list previewed and agreed on in testcases.md
+"""Unit + integration coverage for flatten_json (DESIGN.md Section 3,
+Use Case 7). Test list
 before this file was written — case numbers below match that list.
 """
 
@@ -180,7 +180,7 @@ def test_array_of_non_dict_elements_raises(registry):
 def test_real_github_issues_label_explosion(registry):
     """Real data fetched live from api.github.com/repos/pandas-dev/pandas/issues
     during design, trimmed to number/title/labels and committed to
-    examples/data/json_flatten_github_issues/ — see testcases.md."""
+    examples/data/json_flatten_github_issues/."""
     path = DATA_DIR / "pandas_issues.json"
     assert registry.files is not None
     registry.files.register("pandas_issues.json", path)

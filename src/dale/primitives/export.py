@@ -1,5 +1,5 @@
 """export_handle: delivers a handle's real content straight to a file,
-without it ever passing through the LLM's context — objections #12's
+without it ever passing through the LLM's context — the
 strict-privacy design, pulled forward on its own (the rest of #12 — redacted
 peek/describe, sanitized error content — remains deferred). The LLM sees only
 a confirmation (row/byte count, success/failure), never the exported values,

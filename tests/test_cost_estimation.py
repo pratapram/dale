@@ -1,5 +1,4 @@
-"""Validates the "exact for row count" claim empirically, not just in prose
-(objections #4) — a deliberately adversarial fan-out fixture plus a companion
+"""Validates the "exact for row count" claim empirically, not just in prose — a deliberately adversarial fan-out fixture plus a companion
 common-case fixture asserting no false-positive trigger.
 """
 
