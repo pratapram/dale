@@ -1,0 +1,16 @@
+employee_id,name,title,manager_id
+E001,Alice Nakamura,CEO,
+E002,Ben Ortiz,VP Engineering,E001
+E003,Carla Diaz,Engineering Manager,E002
+E004,Deepak Rao,Software Engineer,E003
+E005,Elena Petrova,Software Engineer,E003
+E006,Farid Haidari,Engineering Manager,E002
+E007,Grace Lin,Software Engineer,E006
+E008,Hassan Ali,Software Engineer,E006
+E009,Ines Moreau,VP Sales,E001
+E010,Jamal Carter,Sales Manager,E009
+E011,Kylie Brennan,Sales Representative,E010
+E012,Liam O'Connor,Sales Representative,E010
+E013,Mei Zhang,VP Finance,E001
+E014,Noah Fischer,Finance Analyst,E013
+E015,Olga Kuznetsova,Finance Analyst,E013

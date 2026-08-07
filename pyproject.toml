@@ -1,0 +1,57 @@
+[project]
+name = "dale"
+version = "0.1.0"
+description = "Declarative Algorithmic Logic Engine — non-Turing-complete tool primitives for LLM-orchestrated data processing"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICEN[CS]E*"]
+requires-python = ">=3.10"
+authors = [
+    { name = "Pratap Ramamurthy", email = "16764459+pratapram@users.noreply.github.com" },
+]
+keywords = ["llm", "agent", "tool-use", "data-processing", "declarative", "safety"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "pydantic>=2.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/pratapram/dale"
+Repository = "https://github.com/pratapram/dale"
+Issues = "https://github.com/pratapram/dale/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+agent = [
+    "pydantic-ai>=0.4",
+]
+
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dale"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: hits a real model provider; costs money; deselected by default"]
+# Belt and braces, on purpose. This keeps a bare `uv run pytest` at zero live
+# tests; the DALE_LIVE_TESTS=1 gate inside tests/test_agent_live.py then stops a
+# developer who types `-m live` with a key already in their shell from spending
+# money by accident. `uv run pytest -m live` with DALE_LIVE_TESTS=1 set is the
+# one deliberate way to run them.
+addopts = "-m 'not live'"

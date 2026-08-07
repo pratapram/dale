@@ -1,0 +1,40 @@
+[1] Intent: keep in-stock
+    Action: in_stock_list = products_list.filter_where(predicate='in_stock == True')
+    Result: ok (TIMING)
+    Registry State:
+      Handle           Type  Size  Memory  Description
+      ---------------  ----  ----  ------  -----------
+      products_list    list  3     165 B   products
+      in_stock_list *  list  2     110 B   in-stock products
+
+[2] Intent: compute value
+    Action: valued_list = in_stock_list.compute_field(as='value', op='multiply', left={'field': 'qty'}, right={'field': 'price'})
+    Result: ok (TIMING)
+    Registry State:
+      Handle         Type  Size  Memory  Description
+      -------------  ----  ----  ------  -----------
+      products_list  list  3     165 B   products
+      in_stock_list  list  2     110 B   in-stock products
+      valued_list *  list  2     140 B   with value
+
+[3] Intent: rank by value
+    Action: ranked_list = valued_list.sort_by(keys=[{'field': 'value', 'order': 'desc'}])
+    Result: ok (TIMING)
+    Registry State:
+      Handle         Type  Size  Memory  Description
+      -------------  ----  ----  ------  -----------
+      products_list  list  3     165 B   products
+      in_stock_list  list  2     110 B   in-stock products
+      valued_list    list  2     140 B   with value
+      ranked_list *  list  2     140 B   ranked
+
+[4] Intent: check
+    Action: ranked_list.peek(n=2)
+    Result: ok (TIMING)
+    Registry State:
+      Handle         Type  Size  Memory  Description
+      -------------  ----  ----  ------  -----------
+      products_list  list  3     165 B   products
+      in_stock_list  list  2     110 B   in-stock products
+      valued_list    list  2     140 B   with value
+      ranked_list *  list  2     140 B   ranked

@@ -1,0 +1,17 @@
+.claude/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Working journals and session notes — never published. See README's Docs
+# section for the design docs that ARE public.
+notes/

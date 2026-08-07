@@ -1,0 +1,7 @@
+employee_id,resource,effect
+E002,prod_database,Allow
+E006,staging_environment,Allow
+E007,prod_database,Deny
+E009,customer_crm,Allow
+E011,customer_crm,Deny
+E013,billing_system,Allow

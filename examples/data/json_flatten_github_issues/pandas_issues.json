@@ -1,0 +1,55 @@
+[
+  {
+    "number": 66596,
+    "title": "BUG: convert_dtypes raises OverflowError for integers outside the int64 range",
+    "labels": []
+  },
+  {
+    "number": 66594,
+    "title": "BUG: read_csv and to_numeric parsed numeric and boolean fields from only the bytes before an embedded NUL (GH#66524)",
+    "labels": [
+      {
+        "id": 76811,
+        "name": "Bug",
+        "color": "e10c02",
+        "description": null
+      },
+      {
+        "id": 47229171,
+        "name": "IO CSV",
+        "color": "5319e7",
+        "description": "read_csv, to_csv"
+      }
+    ]
+  },
+  {
+    "number": 66593,
+    "title": "BUG: memory_usage(deep=True) under-reports by ~4x for arrow-backed string Index once the engine is built",
+    "labels": []
+  },
+  {
+    "number": 66592,
+    "title": "TST: cover surviving mutants from GH#58517 in tz_localize, reset_index, and reindex",
+    "labels": []
+  },
+  {
+    "number": 66591,
+    "title": "TST: cover the guard against describing a column-less DataFrame (GH#58517)",
+    "labels": []
+  },
+  {
+    "number": 66590,
+    "title": "BUG: DataFrame.stack raising a bare AssertionError on duplicate levels (GH#66588)",
+    "labels": []
+  },
+  {
+    "number": 66588,
+    "title": "BUG: DataFrame.stack raises a bare AssertionError when level contains duplicate entries",
+    "labels": []
+  },
+  {
+    "number": 66584,
+    "title": "BUG: Read values from CoveredTableCell in ODF reader",
+    "labels": []
+  }
+]

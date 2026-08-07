@@ -1,0 +1,449 @@
+[
+  {
+    "alive_after": {
+      "in_stock_list": {
+        "avg_record_bytes": 55,
+        "description": "in-stock products",
+        "handle": "in_stock_list",
+        "kind": "list",
+        "primitive": "filter_where",
+        "size": 2,
+        "step": 1
+      },
+      "products_list": {
+        "avg_record_bytes": 55,
+        "description": "products",
+        "handle": "products_list",
+        "kind": "list",
+        "primitive": "fixture",
+        "size": 3,
+        "step": 0
+      }
+    },
+    "alive_before": {
+      "products_list": {
+        "avg_record_bytes": 55,
+        "description": "products",
+        "handle": "products_list",
+        "kind": "list",
+        "primitive": "fixture",
+        "size": 3,
+        "step": 0
+      }
+    },
+    "intent": "keep in-stock",
+    "params": {
+      "description": "in-stock products",
+      "handle": "products_list",
+      "name": "in_stock_list",
+      "predicate": {
+        "field": "in_stock",
+        "op": "==",
+        "value": true
+      }
+    },
+    "primitive": "filter_where",
+    "result": {
+      "auto_inspect": {
+        "describe": {
+          "fields": {
+            "in_stock": "bool",
+            "price": "float",
+            "qty": "int",
+            "sku": "str"
+          },
+          "handle": "in_stock_list"
+        },
+        "peek": {
+          "handle": "in_stock_list",
+          "kind": "list",
+          "requested_n": 3,
+          "sample": [
+            {
+              "in_stock": true,
+              "price": 10.0,
+              "qty": 3,
+              "sku": "A"
+            },
+            {
+              "in_stock": true,
+              "price": 50.0,
+              "qty": 1,
+              "sku": "B"
+            }
+          ]
+        }
+      },
+      "handle": {
+        "avg_record_bytes": 55,
+        "created_by": "filter_where",
+        "description": "in-stock products",
+        "handle": "in_stock_list",
+        "kind": "list",
+        "size": 2,
+        "source_handles": [
+          "products_list"
+        ]
+      },
+      "status": "ok"
+    },
+    "status": "ok",
+    "step": 1
+  },
+  {
+    "alive_after": {
+      "in_stock_list": {
+        "avg_record_bytes": 55,
+        "description": "in-stock products",
+        "handle": "in_stock_list",
+        "kind": "list",
+        "primitive": "filter_where",
+        "size": 2,
+        "step": 1
+      },
+      "products_list": {
+        "avg_record_bytes": 55,
+        "description": "products",
+        "handle": "products_list",
+        "kind": "list",
+        "primitive": "fixture",
+        "size": 3,
+        "step": 0
+      },
+      "valued_list": {
+        "avg_record_bytes": 70,
+        "description": "with value",
+        "handle": "valued_list",
+        "kind": "list",
+        "primitive": "compute_field",
+        "size": 2,
+        "step": 2
+      }
+    },
+    "alive_before": {
+      "in_stock_list": {
+        "avg_record_bytes": 55,
+        "description": "in-stock products",
+        "handle": "in_stock_list",
+        "kind": "list",
+        "primitive": "filter_where",
+        "size": 2,
+        "step": 1
+      },
+      "products_list": {
+        "avg_record_bytes": 55,
+        "description": "products",
+        "handle": "products_list",
+        "kind": "list",
+        "primitive": "fixture",
+        "size": 3,
+        "step": 0
+      }
+    },
+    "intent": "compute value",
+    "params": {
+      "as": "value",
+      "description": "with value",
+      "handle": "in_stock_list",
+      "left": {
+        "field": "qty"
+      },
+      "name": "valued_list",
+      "op": "multiply",
+      "right": {
+        "field": "price"
+      }
+    },
+    "primitive": "compute_field",
+    "result": {
+      "auto_inspect": {
+        "describe": {
+          "fields": {
+            "in_stock": "bool",
+            "price": "float",
+            "qty": "int",
+            "sku": "str",
+            "value": "float"
+          },
+          "handle": "valued_list"
+        },
+        "peek": {
+          "handle": "valued_list",
+          "kind": "list",
+          "requested_n": 3,
+          "sample": [
+            {
+              "in_stock": true,
+              "price": 10.0,
+              "qty": 3,
+              "sku": "A",
+              "value": 30.0
+            },
+            {
+              "in_stock": true,
+              "price": 50.0,
+              "qty": 1,
+              "sku": "B",
+              "value": 50.0
+            }
+          ]
+        }
+      },
+      "handle": {
+        "avg_record_bytes": 70,
+        "created_by": "compute_field",
+        "description": "with value",
+        "handle": "valued_list",
+        "kind": "list",
+        "size": 2,
+        "source_handles": [
+          "in_stock_list"
+        ]
+      },
+      "status": "ok"
+    },
+    "status": "ok",
+    "step": 2
+  },
+  {
+    "alive_after": {
+      "in_stock_list": {
+        "avg_record_bytes": 55,
+        "description": "in-stock products",
+        "handle": "in_stock_list",
+        "kind": "list",
+        "primitive": "filter_where",
+        "size": 2,
+        "step": 1
+      },
+      "products_list": {
+        "avg_record_bytes": 55,
+        "description": "products",
+        "handle": "products_list",
+        "kind": "list",
+        "primitive": "fixture",
+        "size": 3,
+        "step": 0
+      },
+      "ranked_list": {
+        "avg_record_bytes": 70,
+        "description": "ranked",
+        "handle": "ranked_list",
+        "kind": "list",
+        "primitive": "sort_by",
+        "size": 2,
+        "step": 3
+      },
+      "valued_list": {
+        "avg_record_bytes": 70,
+        "description": "with value",
+        "handle": "valued_list",
+        "kind": "list",
+        "primitive": "compute_field",
+        "size": 2,
+        "step": 2
+      }
+    },
+    "alive_before": {
+      "in_stock_list": {
+        "avg_record_bytes": 55,
+        "description": "in-stock products",
+        "handle": "in_stock_list",
+        "kind": "list",
+        "primitive": "filter_where",
+        "size": 2,
+        "step": 1
+      },
+      "products_list": {
+        "avg_record_bytes": 55,
+        "description": "products",
+        "handle": "products_list",
+        "kind": "list",
+        "primitive": "fixture",
+        "size": 3,
+        "step": 0
+      },
+      "valued_list": {
+        "avg_record_bytes": 70,
+        "description": "with value",
+        "handle": "valued_list",
+        "kind": "list",
+        "primitive": "compute_field",
+        "size": 2,
+        "step": 2
+      }
+    },
+    "intent": "rank by value",
+    "params": {
+      "description": "ranked",
+      "handle": "valued_list",
+      "keys": [
+        {
+          "field": "value",
+          "order": "desc"
+        }
+      ],
+      "name": "ranked_list"
+    },
+    "primitive": "sort_by",
+    "result": {
+      "auto_inspect": {
+        "describe": {
+          "fields": {
+            "in_stock": "bool",
+            "price": "float",
+            "qty": "int",
+            "sku": "str",
+            "value": "float"
+          },
+          "handle": "ranked_list"
+        },
+        "peek": {
+          "handle": "ranked_list",
+          "kind": "list",
+          "requested_n": 3,
+          "sample": [
+            {
+              "in_stock": true,
+              "price": 50.0,
+              "qty": 1,
+              "sku": "B",
+              "value": 50.0
+            },
+            {
+              "in_stock": true,
+              "price": 10.0,
+              "qty": 3,
+              "sku": "A",
+              "value": 30.0
+            }
+          ]
+        }
+      },
+      "handle": {
+        "avg_record_bytes": 70,
+        "created_by": "sort_by",
+        "description": "ranked",
+        "handle": "ranked_list",
+        "kind": "list",
+        "size": 2,
+        "source_handles": [
+          "valued_list"
+        ]
+      },
+      "status": "ok"
+    },
+    "status": "ok",
+    "step": 3
+  },
+  {
+    "alive_after": {
+      "in_stock_list": {
+        "avg_record_bytes": 55,
+        "description": "in-stock products",
+        "handle": "in_stock_list",
+        "kind": "list",
+        "primitive": "filter_where",
+        "size": 2,
+        "step": 1
+      },
+      "products_list": {
+        "avg_record_bytes": 55,
+        "description": "products",
+        "handle": "products_list",
+        "kind": "list",
+        "primitive": "fixture",
+        "size": 3,
+        "step": 0
+      },
+      "ranked_list": {
+        "avg_record_bytes": 70,
+        "description": "ranked",
+        "handle": "ranked_list",
+        "kind": "list",
+        "primitive": "sort_by",
+        "size": 2,
+        "step": 3
+      },
+      "valued_list": {
+        "avg_record_bytes": 70,
+        "description": "with value",
+        "handle": "valued_list",
+        "kind": "list",
+        "primitive": "compute_field",
+        "size": 2,
+        "step": 2
+      }
+    },
+    "alive_before": {
+      "in_stock_list": {
+        "avg_record_bytes": 55,
+        "description": "in-stock products",
+        "handle": "in_stock_list",
+        "kind": "list",
+        "primitive": "filter_where",
+        "size": 2,
+        "step": 1
+      },
+      "products_list": {
+        "avg_record_bytes": 55,
+        "description": "products",
+        "handle": "products_list",
+        "kind": "list",
+        "primitive": "fixture",
+        "size": 3,
+        "step": 0
+      },
+      "ranked_list": {
+        "avg_record_bytes": 70,
+        "description": "ranked",
+        "handle": "ranked_list",
+        "kind": "list",
+        "primitive": "sort_by",
+        "size": 2,
+        "step": 3
+      },
+      "valued_list": {
+        "avg_record_bytes": 70,
+        "description": "with value",
+        "handle": "valued_list",
+        "kind": "list",
+        "primitive": "compute_field",
+        "size": 2,
+        "step": 2
+      }
+    },
+    "intent": "check",
+    "params": {
+      "handle": "ranked_list",
+      "n": 2
+    },
+    "primitive": "peek",
+    "result": {
+      "result": {
+        "handle": "ranked_list",
+        "kind": "list",
+        "requested_n": 2,
+        "sample": [
+          {
+            "in_stock": true,
+            "price": 50.0,
+            "qty": 1,
+            "sku": "B",
+            "value": 50.0
+          },
+          {
+            "in_stock": true,
+            "price": 10.0,
+            "qty": 3,
+            "sku": "A",
+            "value": 30.0
+          }
+        ]
+      },
+      "status": "ok"
+    },
+    "status": "ok",
+    "step": 4
+  }
+]

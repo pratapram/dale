@@ -1,0 +1,8 @@
+[1] Intent: keep in-stock
+    Action: in_stock_list = products_list.filter_where(predicate='in_stock == True')
+    Result: ok (TIMING)
+    Registry State:
+      Handle           Type  Size  Memory  Description
+      ---------------  ----  ----  ------  -----------
+      products_list    list  3     165 B   products
+      in_stock_list *  list  2     110 B   in-stock products
