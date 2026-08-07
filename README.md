@@ -95,11 +95,13 @@ registry.create(
     created_by="quickstart",
 )
 
-# Ask for what you want, in plain English.
+# The action log records every call the model makes — its stated reason,
+# the primitive, the parameters, the result. It is how you audit the run.
 action_log = ActionLog()
 action_log.seed_from_registry(registry)
 agent = build_agent(registry, action_log, model=pick_model())
 
+# Ask for what you want, in plain English.
 outcome = run_agent(
     agent,
     "How many people are in Engineering, and what are their names?",
@@ -109,10 +111,11 @@ outcome = run_agent(
 if not outcome.success:
     raise SystemExit(f"run failed: {outcome.error}")
 
-# The answer comes back as real Python, read out of the registry by handle.
+# Store the result of the computation.
 engineering = registry.materialize(outcome.result.output.handle)
-
 print(engineering)
+
+# Get a note about the computation.
 print(outcome.result.output.note)
 ```
 
@@ -121,9 +124,31 @@ print(outcome.result.output.note)
 There are 2 people in Engineering: Alice and Carol.
 ```
 
-**What DALE actually did.** The model never wrote code. It chose one primitive, filled in its
-parameters, and DALE ran it. That trace is what `action_log` holds — for a task this small it's a
-single step:
+**What DALE actually did.** The model never wrote code. Its entire output for this task was one
+JSON tool call — a primitive name and its parameters, validated against that primitive's schema
+before anything ran:
+
+```json
+{
+  "steps": [
+    {
+      "primitive": "filter_where",
+      "handle": "people",
+      "predicate": {"field": "department", "op": "==", "value": "Engineering"},
+      "name": "engineering_people",
+      "description": "people in Engineering",
+      "intent": "keep only Engineering staff"
+    }
+  ]
+}
+```
+
+There is no expression anywhere in that payload — `predicate` is three labelled values, not a
+condition to be evaluated. `intent` is required on every step: the model must say why it is making
+the call. `steps` is a list because the model may batch several already-decided operations into one
+round trip.
+
+`action_log` keeps that trace, and renders it as a readable summary of what was computed:
 
 ```
 [1] Intent: keep only Engineering staff
@@ -131,11 +156,10 @@ single step:
     Result: ok (<0.1 ms)
 ```
 
-The `Intent` line is the model's own reason for the call, required on every step. The `Action` line
-is the entire extent of what it was permitted to emit: a primitive name plus structured parameters —
-`{"field": "department", "op": "==", "value": "Engineering"}` — never an expression, never a line of
-Python. A different model might reach the same answer another way (`group_by` on `department`, then
-read the bucket), but whatever it picks comes from the seventeen primitives below and nothing else.
+The `Action` line is a human-readable representation of the JSON above — a rendering for review, not
+source code, and nothing like it is ever executed. A different model might reach the same answer
+another way (`group_by` on `department`, then read the bucket), but whatever it picks comes from the
+seventeen primitives below and nothing else.
 
 Needs `uv sync --extra agent` and one of `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` /
 `MOONSHOTAI_API_KEY` / `DEEPSEEK_API_KEY` / `ALIBABA_API_KEY`; `pick_model()` takes the first it
@@ -164,25 +188,25 @@ a newly created handle is `out.handle.handle`. Primitives that create a handle s
 leave `.result` empty; inspection primitives (`peek`, `describe`) do the reverse; a refused operation
 returns `status="cost_gate_exceeded"` with its `.estimate` and no handle at all.
 
-| Primitive | Purpose |
-|---|---|
-| `load_csv` | Load a local CSV into a `list` handle, with deterministic type inference. Takes a `file` — a virtual name registered on a `FileRegistry` ahead of time, never a raw path (see [`docs/environment.md`](docs/environment.md)) |
-| `load_json` | Load a local JSON file into a `list` handle (top-level array) or `dict` handle (top-level object) — JSON is a loading path, not a new handle kind. Same `file`-via-`FileRegistry` contract as `load_csv`. Optional `remove_envelope=True` unwraps a single-list-key envelope (e.g. Salesforce's `{"records": [...]}`) straight to a `list` handle — only when the model explicitly asserts it recognizes the shape; DALE never guesses this on its own. Nested structure is otherwise preserved as-is |
-| `filter_where` | Keep records matching a predicate (comparisons, `and`/`or`/`not`) |
-| `compute_field` | Add a derived field (`add`/`subtract`/`multiply`/`divide` over fields or constants) |
-| `sort_by` | Stable multi-key sort, nulls sorted last |
-| `index_by` | Build a unique-keyed `dict` (composite key → single record); errors on duplicates |
-| `group_by` | Build a bucketed `dict` (composite key → list of records) |
-| `priority_reduce` | `index_by`, but for duplicate keys instead of erroring: resolves each group's `value_field` to a single winning value via a priority order (e.g. license tiers, "gold" beats "silver" beats "bronze") — the "Hash map + priority-ordered reduction" pattern |
-| `dict_diff` | Compare two `dict` handles keyed the same way; returns one row per key across their union, each tagged `new`/`removed`/`changed`/`unchanged` |
-| `join_lookup` | Merge a `list` against an `index_by`/`group_by`-built `dict`; real fan-out risk, and a real cost estimator |
-| `window_flag` | Sliding-window occurrence counting/flagging over a group key + orderable field (numeric or ISO 8601) — the "Sliding Window / Two-Pointer" pattern (log-stream sessionization) |
-| `graph_walk_resolve` | Walk each node's single-parent ancestor chain in an `index_by`-built `dict`, collect applicable rules per group field, resolve conflicts via `resolve_priority` — the "Adjacency Graph Traversal" pattern (org-chart permission inheritance) |
-| `flatten_json` | Explode a nested array field into one row per element, carrying selected parent fields down onto each row (e.g. a GitHub issue's `labels` array → one row per label, with the issue number/title attached). A record whose target field is absent, `null`, or an empty array contributes zero rows — not an error. `path` supports one level of nesting today, not arbitrary depth |
-| `peek` | A small sample of a handle — a sanity check, not a data-dump channel. Hard-capped at 50 items **and 4 KB serialized**, whatever the handle holds and however deeply it nests, so a `peek` of a 10-million-row handle costs the same as one of a 10-row handle. Anything cut to fit says so in place: a shortened list ends with `"+N more items"`, a shortened dict gains a `"..."` entry counting the keys not shown, a shortened string ends with `"...(+N more chars)"`, and `"truncated": true` sits alongside the sample — a sample never understates what is there |
-| `describe` | Aggregate statistics for a field (numeric min/max/mean/null-rate, or categorical distinct-count/top-k) — never individual values dumped in bulk. `top_k`'s *values* are subject to the same byte cap and the same in-place markers as `peek`; its counts never are |
-| `release_handle` | Explicit cleanup of a handle no longer needed |
-| `export_handle` | Write a handle's real content straight to a registered output destination (CSV or JSON) — the LLM gets back only a confirmation (row/byte count), never the content itself |
+| Primitive | In → Out | Purpose |
+|---|---|---|
+| `load_csv` | file → list | Load a local CSV into a `list` handle, with deterministic type inference. Takes a `file` — a virtual name registered on a `FileRegistry` ahead of time, never a raw path (see [`docs/environment.md`](docs/environment.md)) |
+| `load_json` | file → list \| dict | Load a local JSON file into a `list` handle (top-level array) or `dict` handle (top-level object) — JSON is a loading path, not a new handle kind. Same `file`-via-`FileRegistry` contract as `load_csv`. Optional `remove_envelope=True` unwraps a single-list-key envelope (e.g. Salesforce's `{"records": [...]}`) straight to a `list` handle — only when the model explicitly asserts it recognizes the shape; DALE never guesses this on its own. Nested structure is otherwise preserved as-is |
+| `filter_where` | list → list | Keep records matching a predicate (comparisons, `and`/`or`/`not`) |
+| `compute_field` | list → list | Add a derived field (`add`/`subtract`/`multiply`/`divide` over fields or constants) |
+| `sort_by` | list → list | Stable multi-key sort, nulls sorted last |
+| `index_by` | list → dict | Build a unique-keyed `dict` (composite key → single record); errors on duplicates |
+| `group_by` | list → dict | Build a bucketed `dict` (composite key → list of records) |
+| `priority_reduce` | list → dict | `index_by`, but for duplicate keys instead of erroring: resolves each group's `value_field` to a single winning value via a priority order (e.g. license tiers, "gold" beats "silver" beats "bronze") — the "Hash map + priority-ordered reduction" pattern |
+| `dict_diff` | dict + dict → list | Compare two `dict` handles keyed the same way; returns one row per key across their union, each tagged `new`/`removed`/`changed`/`unchanged` |
+| `join_lookup` | list + dict → list | Merge a `list` against an `index_by`/`group_by`-built `dict`; real fan-out risk, and a real cost estimator |
+| `window_flag` | list → list | Sliding-window occurrence counting/flagging over a group key + orderable field (numeric or ISO 8601) — the "Sliding Window / Two-Pointer" pattern (log-stream sessionization) |
+| `graph_walk_resolve` | dict + list → list | Walk each node's single-parent ancestor chain in an `index_by`-built `dict`, collect applicable rules per group field, resolve conflicts via `resolve_priority` — the "Adjacency Graph Traversal" pattern (org-chart permission inheritance) |
+| `flatten_json` | list → list | Explode a nested array field into one row per element, carrying selected parent fields down onto each row (e.g. a GitHub issue's `labels` array → one row per label, with the issue number/title attached). A record whose target field is absent, `null`, or an empty array contributes zero rows — not an error. `path` supports one level of nesting today, not arbitrary depth |
+| `peek` | any → sample | A small sample of a handle — a sanity check, not a data-dump channel. Hard-capped at 50 items **and 4 KB serialized**, whatever the handle holds and however deeply it nests, so a `peek` of a 10-million-row handle costs the same as one of a 10-row handle. Anything cut to fit says so in place: a shortened list ends with `"+N more items"`, a shortened dict gains a `"..."` entry counting the keys not shown, a shortened string ends with `"...(+N more chars)"`, and `"truncated": true` sits alongside the sample — a sample never understates what is there |
+| `describe` | any → stats | Aggregate statistics for a field (numeric min/max/mean/null-rate, or categorical distinct-count/top-k) — never individual values dumped in bulk. `top_k`'s *values* are subject to the same byte cap and the same in-place markers as `peek`; its counts never are |
+| `release_handle` | any → — | Explicit cleanup of a handle no longer needed |
+| `export_handle` | list \| dict → file | Write a handle's real content straight to a registered output destination (CSV or JSON) — the LLM gets back only a confirmation (row/byte count), never the content itself |
 
 **The table gives purpose; the library gives parameters.** There is no hand-written parameter table
 anywhere — it would drift. Ask the catalog instead; this is the same schema the LLM is handed, so
