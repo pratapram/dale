@@ -182,6 +182,130 @@ prose about them, and its wording varies from run to run.
 Primitives can also be called directly, with no model involved — `dale.call_primitive(registry,
 name, params)`, same validation and same cost gates. See `examples/05`–`07`.
 
+## Reconcile service data with in-memory business data
+
+A more typical application starts with data from more than one place. Suppose your application
+already holds its orders and product-discount table in memory, then receives status updates from an
+order microservice. Your HTTP client has already parsed the response body — the dictionary below is
+the kind of value you would get from `response.json()`. DALE does not make the network request.
+
+```python
+import dale
+from dale.agent import ActionLog, build_agent, pick_model, run_agent
+
+orders = [
+    {
+        "order_id": "ORD-1001",
+        "product_id": "PROD-A",
+        "quantity": 2,
+        "unit_price": 50.0,
+        "status": "processing",
+    },
+    {
+        "order_id": "ORD-1002",
+        "product_id": "PROD-B",
+        "quantity": 1,
+        "unit_price": 80.0,
+        "status": "processing",
+    },
+]
+
+# An already-parsed JSON response from the order service.
+order_service_response = {
+    "updates": [
+        {"order_id": "ORD-1001", "status": "shipped"},
+        {"order_id": "ORD-1002", "status": "cancelled"},
+        # Not in our order list, so the reconciliation must not create it.
+        {"order_id": "ORD-9999", "status": "shipped"},
+    ]
+}
+
+product_discounts = [
+    {"product_id": "PROD-A", "discount_rate": 0.10},
+    {"product_id": "PROD-B", "discount_rate": 0.25},
+]
+
+registry = dale.DataRegistry()
+registry.create(
+    "list",
+    orders,
+    name="orders",
+    description="orders currently held by this application",
+    created_by="host",
+)
+registry.create(
+    "list",
+    order_service_response["updates"],
+    name="order_updates",
+    description="parsed status updates returned by the order service",
+    created_by="host",
+)
+registry.create(
+    "list",
+    product_discounts,
+    name="product_discounts",
+    description="discount rate for each product",
+    created_by="host",
+)
+
+action_log = ActionLog()
+action_log.seed_from_registry(registry)
+agent = build_agent(registry, action_log, model=pick_model())
+
+outcome = run_agent(
+    agent,
+    """
+    Reconcile the existing orders with the order-service updates and product discounts.
+    Existing orders are authoritative: update their status by order_id, but do not create
+    orders that appear only in order_updates. Match discounts by product_id. For every order,
+    add discount_amount (unit_price * discount_rate), discounted_unit_price
+    (unit_price - discount_amount), and line_total (discounted_unit_price * quantity).
+    Return the reconciled orders.
+    """,
+    deps=registry,
+    action_log=action_log,
+)
+if not outcome.success:
+    raise SystemExit(f"run failed: {outcome.error}")
+
+reconciled_orders = registry.materialize(outcome.result.output.handle)
+print(reconciled_orders)
+```
+
+A successful run produces data equivalent to:
+
+```python
+[
+    {
+        "order_id": "ORD-1001",
+        "product_id": "PROD-A",
+        "quantity": 2,
+        "unit_price": 50.0,
+        "status": "shipped",
+        "discount_rate": 0.1,
+        "discount_amount": 5.0,
+        "discounted_unit_price": 45.0,
+        "line_total": 90.0,
+    },
+    {
+        "order_id": "ORD-1002",
+        "product_id": "PROD-B",
+        "quantity": 1,
+        "unit_price": 80.0,
+        "status": "cancelled",
+        "discount_rate": 0.25,
+        "discount_amount": 20.0,
+        "discounted_unit_price": 60.0,
+        "line_total": 60.0,
+    },
+]
+```
+
+The original `orders` list is unchanged. DALE creates a new result by indexing the updates and
+discounts, joining them onto the existing orders, and applying declarative arithmetic. The model may
+choose the exact sequence, but it can only use DALE's validated primitives; it never writes or runs
+code against these records.
+
 ## Primitives
 
 Every primitive is called through `dale.call_primitive(registry, name, params)`, which validates
