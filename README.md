@@ -1,6 +1,6 @@
 # DALE — Declarative Algorithmic Logic Engine
 
-**Describe the task. Point to the data. DALE agent finishes the task. No code generated.**
+**describe a problem, provide the inputs, and let DALE compose algorithms**
 
 Data stays in host memory — a `DataRegistry` holding native Python `list`/`dict`/`set` — and the
 LLM addresses it only through opaque handles, never as rows in its own context. It selects from a
