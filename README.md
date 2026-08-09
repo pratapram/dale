@@ -141,9 +141,9 @@ reconciled_orders = registry.materialize(outcome.result.output.handle)
 print(reconciled_orders)
 ```
 
-Both examples require one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MOONSHOTAI_API_KEY`,
-`DEEPSEEK_API_KEY`, or `ALIBABA_API_KEY`. Set `DALE_MODEL` to choose a specific provider and model.
-Gemini is not currently supported because its tool schema rejects DALE's recursive predicate type.
+Both examples require credentials for a compatible model provider. Set `DALE_MODEL` to choose a
+specific provider and model; see [Agent integration](docs/agent.md) for current configuration and
+compatibility details.
 
 ## Docs
 
