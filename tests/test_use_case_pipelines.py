@@ -2,13 +2,13 @@
 (`examples/data/`, manifest at `examples/data/README.md`). These pin down the
 ground truth that was previously only verified by hand, one-off, in a prior
 session — turning that anecdotal verification into a real committed test that
-guards against future primitive-behavior regressions.
+guards against future operation-behavior regressions.
 
 Use Case 1 (inventory reconciliation) and Use Case 2 (log sessionization, via
 window_flag) run their DESIGN.md-intended pipelines end to end. Use Case 3
 (churn/feature usage) runs the *alternative* pipeline documented in
 examples/data/README.md, since dict_frequency/set_difference (the intended
-primitives) are not yet built — window_flag/graph_walk_resolve were
+operations) are not yet built — window_flag/graph_walk_resolve were
 built to unblock 2 and 4 specifically.
 Use Case 4 (org permission inheritance) runs via graph_walk_resolve.
 """
@@ -36,10 +36,10 @@ def _load(registry: dale.DataRegistry, path: Path) -> str:
     assert registry.files is not None
     virtual_name = path.name
     registry.files.register(virtual_name, path)
-    out = dale.call_primitive(
+    out = dale.call_operation(
         registry, "load_csv", {"file": virtual_name, "name": _step_name(), "description": "d"}
     )
-    return out.handle.handle
+    return out.handle.name
 
 
 def test_use_case_1_inventory_reconciliation(registry):
@@ -48,18 +48,18 @@ def test_use_case_1_inventory_reconciliation(registry):
     stock = _load(registry, base / "stock_counts.csv")
     pricing = _load(registry, base / "pricing_overrides.csv")
 
-    stock_idx = dale.call_primitive(
+    stock_idx = dale.call_operation(
         registry,
         "index_by",
         {"handle": stock, "key_fields": ["sku"], "name": _step_name(), "description": "d"},
-    ).handle.handle
-    pricing_idx = dale.call_primitive(
+    ).handle.name
+    pricing_idx = dale.call_operation(
         registry,
         "index_by",
         {"handle": pricing, "key_fields": ["sku"], "name": _step_name(), "description": "d"},
-    ).handle.handle
+    ).handle.name
 
-    joined1 = dale.call_primitive(
+    joined1 = dale.call_operation(
         registry,
         "join_lookup",
         {
@@ -70,8 +70,8 @@ def test_use_case_1_inventory_reconciliation(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
-    joined2 = dale.call_primitive(
+    ).handle.name
+    joined2 = dale.call_operation(
         registry,
         "join_lookup",
         {
@@ -82,12 +82,12 @@ def test_use_case_1_inventory_reconciliation(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
+    ).handle.name
 
     # Ordering ops (>) raise on a missing field (SKU-1020, untracked stock) —
     # equality-class ops (!=) treat missing as None instead. See the README's
     # edge-case notes.
-    in_stock = dale.call_primitive(
+    in_stock = dale.call_operation(
         registry,
         "filter_where",
         {
@@ -96,8 +96,8 @@ def test_use_case_1_inventory_reconciliation(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
-    priced = dale.call_primitive(
+    ).handle.name
+    priced = dale.call_operation(
         registry,
         "filter_where",
         {
@@ -106,9 +106,9 @@ def test_use_case_1_inventory_reconciliation(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
+    ).handle.name
 
-    margin = dale.call_primitive(
+    margin = dale.call_operation(
         registry,
         "compute_field",
         {
@@ -120,8 +120,8 @@ def test_use_case_1_inventory_reconciliation(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
-    sorted_h = dale.call_primitive(
+    ).handle.name
+    sorted_h = dale.call_operation(
         registry,
         "sort_by",
         {
@@ -130,7 +130,7 @@ def test_use_case_1_inventory_reconciliation(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
+    ).handle.name
 
     rows = registry.materialize(sorted_h)
     result = [(r["sku"], round(r["margin"], 2)) for r in rows]
@@ -160,7 +160,7 @@ def test_use_case_2_log_sessionization(registry):
     base = DATA_DIR / "02_log_sessionization"
     logs = _load(registry, base / "auth_logs.csv")
 
-    flagged = dale.call_primitive(
+    flagged = dale.call_operation(
         registry,
         "window_flag",
         {
@@ -173,9 +173,9 @@ def test_use_case_2_log_sessionization(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
+    ).handle.name
 
-    flagged_rows = dale.call_primitive(
+    flagged_rows = dale.call_operation(
         registry,
         "filter_where",
         {
@@ -184,7 +184,7 @@ def test_use_case_2_log_sessionization(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
+    ).handle.name
 
     rows = registry.materialize(flagged_rows)
     flagged_ips = sorted({r["source_ip"] for r in rows})
@@ -203,12 +203,12 @@ def test_use_case_3_churn_feature_usage(registry):
     subs = _load(registry, base / "active_subscriptions.csv")
     events = _load(registry, base / "feature_events.csv")
 
-    events_grouped = dale.call_primitive(
+    events_grouped = dale.call_operation(
         registry,
         "group_by",
         {"handle": events, "key_fields": ["account_id"], "name": _step_name(), "description": "d"},
-    ).handle.handle
-    joined = dale.call_primitive(
+    ).handle.name
+    joined = dale.call_operation(
         registry,
         "join_lookup",
         {
@@ -219,11 +219,11 @@ def test_use_case_3_churn_feature_usage(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
+    ).handle.name
 
     # Accounts with zero feature events never got a matched bucket merged in,
     # so `feature` is missing on their row — that's the churn-risk signal.
-    churn_risk = dale.call_primitive(
+    churn_risk = dale.call_operation(
         registry,
         "filter_where",
         {
@@ -232,7 +232,7 @@ def test_use_case_3_churn_feature_usage(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
+    ).handle.name
 
     rows = registry.materialize(churn_risk)
     account_ids = sorted(r["account_id"] for r in rows)
@@ -245,13 +245,13 @@ def test_use_case_4_org_permissions(registry):
     org = _load(registry, base / "org_structure.csv")
     rules = _load(registry, base / "policy_rules.csv")
 
-    org_idx = dale.call_primitive(
+    org_idx = dale.call_operation(
         registry,
         "index_by",
         {"handle": org, "key_fields": ["employee_id"], "name": _step_name(), "description": "d"},
-    ).handle.handle
+    ).handle.name
 
-    effective = dale.call_primitive(
+    effective = dale.call_operation(
         registry,
         "graph_walk_resolve",
         {
@@ -265,7 +265,7 @@ def test_use_case_4_org_permissions(registry):
             "name": _step_name(),
             "description": "d",
         },
-    ).handle.handle
+    ).handle.name
 
     rows = registry.materialize(effective)
     by_employee: dict[str, dict[str, str]] = {}
@@ -296,7 +296,7 @@ def test_use_case_6_license_reconciliation(registry):
     """The project's original
     motivating problem. The three tier lists are unioned and tagged by the
     invoker in plain Python before DALE ever sees them (no union/concat
-    primitive exists yet — same "assembly is the invoker's job" precedent
+    operation exists yet — same "assembly is the invoker's job" precedent
     DALE already applies to paginated API responses); DALE's own
     job starts at priority_reduce."""
     base = DATA_DIR / "license_reconciliation"
@@ -309,11 +309,11 @@ def test_use_case_6_license_reconciliation(registry):
         "list", candidates, name="candidates", description="d", created_by="test"
     )
 
-    resolved = dale.call_primitive(
+    resolved = dale.call_operation(
         registry,
         "priority_reduce",
         {
-            "handle": candidates_meta.handle,
+            "handle": candidates_meta.name,
             "key_fields": ["email"],
             "value_field": "tier",
             "priority": ["gold", "silver", "bronze"],
@@ -321,7 +321,7 @@ def test_use_case_6_license_reconciliation(registry):
             "description": "d",
         },
     )
-    assert registry.materialize(resolved.handle.handle) == {
+    assert registry.materialize(resolved.handle.name) == {
         "alice@co.com": "gold",
         "bob@co.com": "gold",
         "carol@co.com": "silver",
@@ -334,17 +334,17 @@ def test_use_case_6_license_reconciliation(registry):
         "dict", previous_data, name="previous", description="d", created_by="test"
     )
 
-    diff = dale.call_primitive(
+    diff = dale.call_operation(
         registry,
         "dict_diff",
         {
-            "current_handle": resolved.handle.handle,
-            "previous_handle": previous_meta.handle,
+            "current_handle": resolved.handle.name,
+            "previous_handle": previous_meta.name,
             "name": "diff",
             "description": "d",
         },
     )
-    rows = {r["key"]: r["status"] for r in registry.materialize(diff.handle.handle)}
+    rows = {r["key"]: r["status"] for r in registry.materialize(diff.handle.name)}
     assert rows == {
         "alice@co.com": "changed",
         "bob@co.com": "new",
@@ -376,28 +376,28 @@ def _uc3_large_registry():
 
 def _run_diff_route(registry):
     """The exact 5-call pipeline a live gpt-5.6 run produced."""
-    dale.call_primitive(
+    dale.call_operation(
         registry,
         "index_by",
         {"handle": "active_subscriptions", "key_fields": ["account_id"], "name": "subs_idx", "description": "d"},
     )
-    dale.call_primitive(
+    dale.call_operation(
         registry,
         "join_lookup",
         {"base_handle": "feature_events", "index_handle": "subs_idx", "on": ["account_id"],
          "fields": ["company"], "how": "inner", "name": "ev_active", "description": "d"},
     )
-    dale.call_primitive(
+    dale.call_operation(
         registry,
         "group_by",
         {"handle": "ev_active", "key_fields": ["account_id"], "name": "with_events", "description": "d"},
     )
-    dale.call_primitive(
+    dale.call_operation(
         registry,
         "dict_diff",
         {"previous_handle": "subs_idx", "current_handle": "with_events", "name": "diff", "description": "d"},
     )
-    return dale.call_primitive(
+    return dale.call_operation(
         registry,
         "filter_where",
         {"handle": "diff", "predicate": {"field": "status", "op": "==", "value": "removed"},
@@ -412,7 +412,7 @@ def test_uc3_large_checker_accepts_dict_diff_shaped_answer():
 
     registry = _uc3_large_registry()
     out = _run_diff_route(registry)
-    rows = registry.materialize(out.handle.handle)
+    rows = registry.materialize(out.handle.name)
     # Precondition: the answer really is diff-shaped, not a record list.
     assert "account_id" not in rows[0] and "key" in rows[0]
     assert check_uc3_large(registry, None, "") is True

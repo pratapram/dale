@@ -5,19 +5,19 @@
         "avg_record_bytes": 55,
         "description": "in-stock products",
         "handle": "in_stock_list",
-        "kind": "list",
-        "primitive": "filter_where",
+        "operation": "filter_where",
         "size": 2,
-        "step": 1
+        "step": 1,
+        "type": "list"
       },
       "products_list": {
         "avg_record_bytes": 55,
         "description": "products",
         "handle": "products_list",
-        "kind": "list",
-        "primitive": "fixture",
+        "operation": "fixture",
         "size": 3,
-        "step": 0
+        "step": 0,
+        "type": "list"
       }
     },
     "alive_before": {
@@ -25,13 +25,14 @@
         "avg_record_bytes": 55,
         "description": "products",
         "handle": "products_list",
-        "kind": "list",
-        "primitive": "fixture",
+        "operation": "fixture",
         "size": 3,
-        "step": 0
+        "step": 0,
+        "type": "list"
       }
     },
     "intent": "keep in-stock",
+    "operation": "filter_where",
     "params": {
       "description": "in-stock products",
       "handle": "products_list",
@@ -42,7 +43,6 @@
         "value": true
       }
     },
-    "primitive": "filter_where",
     "result": {
       "auto_inspect": {
         "describe": {
@@ -56,7 +56,6 @@
         },
         "peek": {
           "handle": "in_stock_list",
-          "kind": "list",
           "requested_n": 3,
           "sample": [
             {
@@ -71,19 +70,20 @@
               "qty": 1,
               "sku": "B"
             }
-          ]
+          ],
+          "type": "list"
         }
       },
       "handle": {
         "avg_record_bytes": 55,
         "created_by": "filter_where",
         "description": "in-stock products",
-        "handle": "in_stock_list",
-        "kind": "list",
+        "name": "in_stock_list",
         "size": 2,
         "source_handles": [
           "products_list"
-        ]
+        ],
+        "type": "list"
       },
       "status": "ok"
     },
@@ -96,28 +96,28 @@
         "avg_record_bytes": 55,
         "description": "in-stock products",
         "handle": "in_stock_list",
-        "kind": "list",
-        "primitive": "filter_where",
+        "operation": "filter_where",
         "size": 2,
-        "step": 1
+        "step": 1,
+        "type": "list"
       },
       "products_list": {
         "avg_record_bytes": 55,
         "description": "products",
         "handle": "products_list",
-        "kind": "list",
-        "primitive": "fixture",
+        "operation": "fixture",
         "size": 3,
-        "step": 0
+        "step": 0,
+        "type": "list"
       },
       "valued_list": {
         "avg_record_bytes": 70,
         "description": "with value",
         "handle": "valued_list",
-        "kind": "list",
-        "primitive": "compute_field",
+        "operation": "compute_field",
         "size": 2,
-        "step": 2
+        "step": 2,
+        "type": "list"
       }
     },
     "alive_before": {
@@ -125,22 +125,23 @@
         "avg_record_bytes": 55,
         "description": "in-stock products",
         "handle": "in_stock_list",
-        "kind": "list",
-        "primitive": "filter_where",
+        "operation": "filter_where",
         "size": 2,
-        "step": 1
+        "step": 1,
+        "type": "list"
       },
       "products_list": {
         "avg_record_bytes": 55,
         "description": "products",
         "handle": "products_list",
-        "kind": "list",
-        "primitive": "fixture",
+        "operation": "fixture",
         "size": 3,
-        "step": 0
+        "step": 0,
+        "type": "list"
       }
     },
     "intent": "compute value",
+    "operation": "compute_field",
     "params": {
       "as": "value",
       "description": "with value",
@@ -154,7 +155,6 @@
         "field": "price"
       }
     },
-    "primitive": "compute_field",
     "result": {
       "auto_inspect": {
         "describe": {
@@ -169,7 +169,6 @@
         },
         "peek": {
           "handle": "valued_list",
-          "kind": "list",
           "requested_n": 3,
           "sample": [
             {
@@ -186,19 +185,20 @@
               "sku": "B",
               "value": 50.0
             }
-          ]
+          ],
+          "type": "list"
         }
       },
       "handle": {
         "avg_record_bytes": 70,
         "created_by": "compute_field",
         "description": "with value",
-        "handle": "valued_list",
-        "kind": "list",
+        "name": "valued_list",
         "size": 2,
         "source_handles": [
           "in_stock_list"
-        ]
+        ],
+        "type": "list"
       },
       "status": "ok"
     },
@@ -211,37 +211,37 @@
         "avg_record_bytes": 55,
         "description": "in-stock products",
         "handle": "in_stock_list",
-        "kind": "list",
-        "primitive": "filter_where",
+        "operation": "filter_where",
         "size": 2,
-        "step": 1
+        "step": 1,
+        "type": "list"
       },
       "products_list": {
         "avg_record_bytes": 55,
         "description": "products",
         "handle": "products_list",
-        "kind": "list",
-        "primitive": "fixture",
+        "operation": "fixture",
         "size": 3,
-        "step": 0
+        "step": 0,
+        "type": "list"
       },
       "ranked_list": {
         "avg_record_bytes": 70,
         "description": "ranked",
         "handle": "ranked_list",
-        "kind": "list",
-        "primitive": "sort_by",
+        "operation": "sort_by",
         "size": 2,
-        "step": 3
+        "step": 3,
+        "type": "list"
       },
       "valued_list": {
         "avg_record_bytes": 70,
         "description": "with value",
         "handle": "valued_list",
-        "kind": "list",
-        "primitive": "compute_field",
+        "operation": "compute_field",
         "size": 2,
-        "step": 2
+        "step": 2,
+        "type": "list"
       }
     },
     "alive_before": {
@@ -249,31 +249,32 @@
         "avg_record_bytes": 55,
         "description": "in-stock products",
         "handle": "in_stock_list",
-        "kind": "list",
-        "primitive": "filter_where",
+        "operation": "filter_where",
         "size": 2,
-        "step": 1
+        "step": 1,
+        "type": "list"
       },
       "products_list": {
         "avg_record_bytes": 55,
         "description": "products",
         "handle": "products_list",
-        "kind": "list",
-        "primitive": "fixture",
+        "operation": "fixture",
         "size": 3,
-        "step": 0
+        "step": 0,
+        "type": "list"
       },
       "valued_list": {
         "avg_record_bytes": 70,
         "description": "with value",
         "handle": "valued_list",
-        "kind": "list",
-        "primitive": "compute_field",
+        "operation": "compute_field",
         "size": 2,
-        "step": 2
+        "step": 2,
+        "type": "list"
       }
     },
     "intent": "rank by value",
+    "operation": "sort_by",
     "params": {
       "description": "ranked",
       "handle": "valued_list",
@@ -285,7 +286,6 @@
       ],
       "name": "ranked_list"
     },
-    "primitive": "sort_by",
     "result": {
       "auto_inspect": {
         "describe": {
@@ -300,7 +300,6 @@
         },
         "peek": {
           "handle": "ranked_list",
-          "kind": "list",
           "requested_n": 3,
           "sample": [
             {
@@ -317,19 +316,20 @@
               "sku": "A",
               "value": 30.0
             }
-          ]
+          ],
+          "type": "list"
         }
       },
       "handle": {
         "avg_record_bytes": 70,
         "created_by": "sort_by",
         "description": "ranked",
-        "handle": "ranked_list",
-        "kind": "list",
+        "name": "ranked_list",
         "size": 2,
         "source_handles": [
           "valued_list"
-        ]
+        ],
+        "type": "list"
       },
       "status": "ok"
     },
@@ -342,37 +342,37 @@
         "avg_record_bytes": 55,
         "description": "in-stock products",
         "handle": "in_stock_list",
-        "kind": "list",
-        "primitive": "filter_where",
+        "operation": "filter_where",
         "size": 2,
-        "step": 1
+        "step": 1,
+        "type": "list"
       },
       "products_list": {
         "avg_record_bytes": 55,
         "description": "products",
         "handle": "products_list",
-        "kind": "list",
-        "primitive": "fixture",
+        "operation": "fixture",
         "size": 3,
-        "step": 0
+        "step": 0,
+        "type": "list"
       },
       "ranked_list": {
         "avg_record_bytes": 70,
         "description": "ranked",
         "handle": "ranked_list",
-        "kind": "list",
-        "primitive": "sort_by",
+        "operation": "sort_by",
         "size": 2,
-        "step": 3
+        "step": 3,
+        "type": "list"
       },
       "valued_list": {
         "avg_record_bytes": 70,
         "description": "with value",
         "handle": "valued_list",
-        "kind": "list",
-        "primitive": "compute_field",
+        "operation": "compute_field",
         "size": 2,
-        "step": 2
+        "step": 2,
+        "type": "list"
       }
     },
     "alive_before": {
@@ -380,49 +380,48 @@
         "avg_record_bytes": 55,
         "description": "in-stock products",
         "handle": "in_stock_list",
-        "kind": "list",
-        "primitive": "filter_where",
+        "operation": "filter_where",
         "size": 2,
-        "step": 1
+        "step": 1,
+        "type": "list"
       },
       "products_list": {
         "avg_record_bytes": 55,
         "description": "products",
         "handle": "products_list",
-        "kind": "list",
-        "primitive": "fixture",
+        "operation": "fixture",
         "size": 3,
-        "step": 0
+        "step": 0,
+        "type": "list"
       },
       "ranked_list": {
         "avg_record_bytes": 70,
         "description": "ranked",
         "handle": "ranked_list",
-        "kind": "list",
-        "primitive": "sort_by",
+        "operation": "sort_by",
         "size": 2,
-        "step": 3
+        "step": 3,
+        "type": "list"
       },
       "valued_list": {
         "avg_record_bytes": 70,
         "description": "with value",
         "handle": "valued_list",
-        "kind": "list",
-        "primitive": "compute_field",
+        "operation": "compute_field",
         "size": 2,
-        "step": 2
+        "step": 2,
+        "type": "list"
       }
     },
     "intent": "check",
+    "operation": "peek",
     "params": {
       "handle": "ranked_list",
       "n": 2
     },
-    "primitive": "peek",
     "result": {
       "result": {
         "handle": "ranked_list",
-        "kind": "list",
         "requested_n": 2,
         "sample": [
           {
@@ -439,7 +438,8 @@
             "sku": "A",
             "value": 30.0
           }
-        ]
+        ],
+        "type": "list"
       },
       "status": "ok"
     },

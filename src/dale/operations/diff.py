@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from dale.catalog import PrimitiveOutput, primitive
+from dale.catalog import OperationOutput, operation
 from dale.errors import TypeMismatchError
 from dale.registry import DataRegistry
 
@@ -30,8 +30,8 @@ def _status(key: Any, current: dict, previous: dict) -> str:
     return "changed" if current[key] != previous[key] else "unchanged"
 
 
-@primitive("dict_diff", DictDiffParams, bounded_by_input=True, creates_handle=True)
-def dict_diff(registry: DataRegistry, params: DictDiffParams) -> PrimitiveOutput:
+@operation("dict_diff", DictDiffParams, bounded_by_input=True, creates_handle=True)
+def dict_diff(registry: DataRegistry, params: DictDiffParams) -> OperationOutput:
     """Compare two dict handles (any two — priority_reduce's output, a plain
     load_json dict, anything keyed the same way) and return a new list
     handle, one row per key across the union of both, each tagged "new"/
@@ -41,15 +41,15 @@ def dict_diff(registry: DataRegistry, params: DictDiffParams) -> PrimitiveOutput
     was never returned."""
     current_meta = registry.meta(params.current_handle)
     previous_meta = registry.meta(params.previous_handle)
-    if current_meta.kind != "dict":
+    if current_meta.type != "dict":
         raise TypeMismatchError(
-            f"dict_diff current_handle must be a dict, got {current_meta.kind!r}",
-            details={"handle": params.current_handle, "kind": current_meta.kind},
+            f"dict_diff current_handle must be a dict, got {current_meta.type!r}",
+            details={"handle": params.current_handle, "type": current_meta.type},
         )
-    if previous_meta.kind != "dict":
+    if previous_meta.type != "dict":
         raise TypeMismatchError(
-            f"dict_diff previous_handle must be a dict, got {previous_meta.kind!r}",
-            details={"handle": params.previous_handle, "kind": previous_meta.kind},
+            f"dict_diff previous_handle must be a dict, got {previous_meta.type!r}",
+            details={"handle": params.previous_handle, "type": previous_meta.type},
         )
 
     current = registry.get(params.current_handle)
@@ -74,4 +74,4 @@ def dict_diff(registry: DataRegistry, params: DictDiffParams) -> PrimitiveOutput
         created_by="dict_diff",
         source_handles=[params.current_handle, params.previous_handle],
     )
-    return PrimitiveOutput(status="ok", handle=new_meta)
+    return OperationOutput(status="ok", handle=new_meta)

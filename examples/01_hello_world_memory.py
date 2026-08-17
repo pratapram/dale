@@ -5,7 +5,7 @@ DataRegistry — no file, no FileRegistry — and handed to an agent along with
 a one-line, plain-English task. The model never sees the rows themselves,
 only handle metadata (dale.agent.registry_state_summary) and whatever a
 tool call explicitly returns; it solves the task entirely by choosing
-primitives and structured parameters, never by writing code.
+operations and structured parameters, never by writing code.
 
 See examples/02_hello_world_file.py for the file-backed counterpart, and
 examples/04_llm_orchestrated.py for a longer, multi-step version of this

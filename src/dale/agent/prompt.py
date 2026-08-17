@@ -36,7 +36,7 @@ when you need it."""
 
 def _auto_inspect(registry: dale.DataRegistry, handle: str) -> dict[str, Any] | None:
     """Run peek+describe directly against the catalog function, not through
-    dale.call_primitive — this is bonus information spliced into an existing
+    dale.call_operation — this is bonus information spliced into an existing
     tool result or the system prompt, not a call the model made, so it
     shouldn't consume a max_tool_calls slot or appear as its own ActionLog
     entry. Returns None if the handle can't be inspected (best-effort
@@ -44,11 +44,11 @@ def _auto_inspect(registry: dale.DataRegistry, handle: str) -> dict[str, Any] | 
     call it's attached to). Caller is responsible for checking
     registry.privacy_mode first — this function doesn't gate on it, since
     peek/describe already redact correctly on their own (see
-    src/dale/primitives/inspect.py) and the "skip when privacy_mode" policy
-    is a peek_at_every_step decision, not an inspection-primitive one."""
+    src/dale/operations/inspect.py) and the "skip when privacy_mode" policy
+    is a peek_at_every_step decision, not an inspection-operation one."""
     try:
-        peek_spec = dale.get_primitive("peek")
-        describe_spec = dale.get_primitive("describe")
+        peek_spec = dale.get_operation("peek")
+        describe_spec = dale.get_operation("describe")
         peek_out = peek_spec.fn(registry, peek_spec.param_schema(handle=handle, n=_AUTO_PEEK_N))
         describe_out = describe_spec.fn(registry, describe_spec.param_schema(handle=handle))
     except dale.DaleError:
@@ -64,11 +64,11 @@ def _initial_inspect_summary(registry: dale.DataRegistry) -> str:
     privacy_mode (see build_agent) rather than relying on it to no-op."""
     lines = []
     for meta in registry.list_handles():
-        inspected = _auto_inspect(registry, meta.handle)
+        inspected = _auto_inspect(registry, meta.name)
         if inspected is None:
             continue
         lines.append(
-            f"- {meta.handle}:\n"
+            f"- {meta.name}:\n"
             f"    peek: {json.dumps(inspected['peek'], default=str)}\n"
             f"    describe: {json.dumps(inspected['describe'], default=str)}"
         )
@@ -82,11 +82,11 @@ def _initial_inspect_summary(registry: dale.DataRegistry) -> str:
 
 DEFAULT_SYSTEM_PROMPT = """\
 You are an Algorithmic Orchestrator. You solve data-processing tasks by \
-calling a small set of declarative primitives against data held in host \
+calling a small set of declarative operations against data held in host \
 memory. You never see the underlying data directly — only structural metadata \
 and whatever a call explicitly returns — and you never write or execute code. \
-You reach every primitive through one tool, `run_plan`, which takes a list of \
-`steps`: one step per primitive call, run in order. A single call is simply a \
+You reach every operation through one tool, `run_plan`, which takes a list of \
+`steps`: one step per operation call, run in order. A single call is simply a \
 list of one, so batch whenever you already know the shape of what you need. \
 Every step must use structured parameters (field/op/value predicates, \
 computed-field specs, etc.), never expressions or code strings. Every step \
@@ -95,8 +95,8 @@ specific call. Always fill it in; it becomes part of an auditable \
 action log. Steps that create a new handle also take `name` and `description`. \
 `name` becomes that handle's real identifier — every later step \
 references it by exactly this name, so it must read like a Python variable \
-name and must not already be in use. Suffix it with the handle's kind (e.g. \
-"in_stock_items_list", "org_dict" — not "list_5") so the kind is legible \
+name and must not already be in use. Suffix it with the handle's type (e.g. \
+"in_stock_items_list", "org_dict" — not "list_5") so the type is legible \
 from the name alone. `description` is one sentence on what the handle contains, e.g. "products \
 currently in stock, sorted by margin" — or, honestly, "unknown, not yet \
 inspected" when that's true; that's a complete and useful answer, not one to \
@@ -119,7 +119,7 @@ def registry_state_summary(registry: dale.DataRegistry) -> str:
     lines = []
     for meta in registry.list_handles():
         extra = f", value_shape={meta.value_shape}" if meta.value_shape else ""
-        lines.append(f"- {meta.handle}: {meta.kind}, size={meta.size}{extra} — {meta.description}")
+        lines.append(f"- {meta.name}: {meta.type}, size={meta.size}{extra} — {meta.description}")
     return "\n".join(lines) if lines else "(none loaded yet)"
 
 

@@ -1,6 +1,6 @@
 """Pre-execution cost estimation.
 
-Because the primitive set is closed and known in advance — not arbitrary
+Because the operation set is closed and known in advance — not arbitrary
 generated code — the cost of an operation can often be computed or tightly
 bounded *before* it runs. Row-count estimates for join-shaped operations are
 exact (built from already-materialized index bucket sizes); byte estimates are

@@ -8,7 +8,7 @@ model's own context.
 
 The model never sees a real filesystem path on either end — only the
 virtual names we register — and it calls load_csv/export_handle itself,
-exactly like every other primitive.
+exactly like every other operation.
 
 FileRegistry.register(name, path) / register_output(name, path) are the
 invoker-side mappings from LLM-visible virtual names to real locations,

@@ -8,7 +8,7 @@ diffed against the previous hour's assignment to report who's new, who was
 removed, and whose tier changed.
 
 The three tier lists are unioned and tagged with their source tier here, in
-plain Python, before DALE ever sees the data — no union/concat primitive
+plain Python, before DALE ever sees the data — no union/concat operation
 exists in the catalog yet, and this kind of mechanical assembly isn't an
 interesting decision for the model to make anyway (DALE already
 treats assembling paginated API responses into one document the same way:

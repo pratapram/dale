@@ -1,6 +1,6 @@
 # DALE Guide
 
-This guide covers DALE's design tradeoffs, agent interaction, primitive catalog, examples,
+This guide covers DALE's design tradeoffs, agent interaction, operation catalog, examples,
 extension mechanism, and development workflow. For installation and the shortest runnable paths,
 start with the [README](README.md).
 
@@ -8,7 +8,7 @@ start with the [README](README.md).
 
 Data stays in host memory — a `DataRegistry` holding native Python `list`/`dict`/`set` — and the
 LLM addresses it only through opaque handles, never as rows in its own context. It selects from a
-small, closed set of declarative primitives and supplies structured parameters (predicates,
+small, closed set of declarative operations and supplies structured parameters (predicates,
 computed fields, priority orders), never expressions or logic.
 
 This is what gives DALE two properties code-generation-based alternatives (agents that write and
@@ -18,12 +18,12 @@ execute Python against your data) can't offer:
   executed — the LLM's entire output is validated data, not instructions. That removes the sandbox
   problem, not every knob: `max_tool_calls` defaults to unlimited, there's no OS-level backstop, and
   process isolation is the invoker's job — see [`docs/environment.md`](docs/environment.md).
-- **Pre-execution cost estimation.** Because the primitive set is closed and known in advance, the
+- **Pre-execution cost estimation.** Because the operation set is closed and known in advance, the
   cost of an operation — a join's output size, for example — can be computed *before* it runs, not
   discovered by running it and hoping it doesn't blow up.
 
 **How large is "large"?** Raw row content does not grow in the model's context with your data. The
-model sees handle metadata (`kind`, `size`, `description`) plus a hard-capped sample, so increasing
+model sees handle metadata (`type`, `size`, `description`) plus a hard-capped sample, so increasing
 the row count changes the reported `size`, not the amount of sampled row data; only host memory
 scales with the collection itself. An
 operation whose estimated output exceeds the default ceiling — **1,000,000 rows or 500 MB** — is
@@ -42,8 +42,8 @@ generalizes that from a relational database to in-memory Python collections, wit
 at the graph-walk, sliding-window, and priority-conflict operations SQL doesn't express naturally.
 
 **The cost is real, and there is no escape hatch.** If your task doesn't decompose into the
-primitives below, you cannot drop into Python to finish it — the catalog grows only when a
-developer writes and reviews a new primitive at build time. Don't use DALE for **long-horizon,
+operations below, you cannot drop into Python to finish it — the catalog grows only when a
+developer writes and reviews a new operation at build time. Don't use DALE for **long-horizon,
 turn-by-turn state mutation** (a ledger accumulating transactions, a controller tracking relative
 commands — stateful code-execution runtimes are right for that; see `DESIGN.md`'s "Non-Goal / Scope
 Boundary"), for **open-ended analysis needing pandas' full surface**, or against **live data
@@ -51,7 +51,7 @@ sources** — there are no database or API connectors, deliberately, so somethin
 materialize the data first. And note that evaluation so far is a **preliminary pilot** (N=5, four
 of eight patterns, one dataset size), not a validated success rate.
 
-**Status:** alpha (`0.1.1`). Core engine and a foundational primitive set, with tests, plus a
+**Status:** alpha (`0.2.0`). Core engine and a foundational operation set, with tests, plus a
 PydanticAI-based agent-integration module (`src/dale/agent/`) verified end-to-end against a live
 Anthropic account. Interfaces may still change. Issues: https://github.com/pratapram/dale/issues
 
@@ -76,7 +76,7 @@ uv sync --extra dev --extra agent    # or: pip install -e ".[dev,agent]"
 ## How the agent interaction works
 
 You have an employee roster in memory, and you want to know how many people are in Engineering. You
-say that in plain English. The agent picks the primitives, runs them against the roster, and hands
+say that in plain English. The agent picks the operations, runs them against the roster, and hands
 back a handle to the answer — it never sees the rows themselves.
 
 ```python
@@ -90,7 +90,7 @@ people = [
     {"name": "Carol", "department": "Engineering", "age": 41},
 ]
 
-# Hand it to DALE. From here on the model sees only the handle's name, kind,
+# Hand it to DALE. From here on the model sees only the handle's name, type,
 # size, and description — never the rows.
 registry = dale.DataRegistry()
 registry.create(
@@ -102,7 +102,7 @@ registry.create(
 )
 
 # The action log records every call the model makes — its stated reason,
-# the primitive, the parameters, the result. It is how you audit the run.
+# the operation, the parameters, the result. It is how you audit the run.
 action_log = ActionLog()
 action_log.seed_from_registry(registry)
 agent = build_agent(registry, action_log, model=pick_model())
@@ -131,14 +131,14 @@ There are 2 people in Engineering: Alice and Carol.
 ```
 
 **What DALE actually did.** The model never wrote code. Its entire output for this task was one
-JSON tool call — a primitive name and its parameters, validated against that primitive's schema
+JSON tool call — an operation name and its parameters, validated against that operation's schema
 before anything ran:
 
 ```json
 {
   "steps": [
     {
-      "primitive": "filter_where",
+      "operation": "filter_where",
       "handle": "people",
       "predicate": {"field": "department", "op": "==", "value": "Engineering"},
       "name": "engineering_people",
@@ -169,12 +169,12 @@ round trip.
 
 The `Action` line is a human-readable representation of the JSON above — a rendering for review, not
 source code, and nothing like it is ever executed. The registry state under it is the whole of what
-the model knows about your data after the call: names, kinds, sizes, and the descriptions you wrote.
+the model knows about your data after the call: names, types, sizes, and the descriptions you wrote.
 Not one row of `people` appears there, and none was ever in the model's context — `*` just marks the
 handle this step created.
 
 A different model might reach the same answer another way (`group_by` on `department`, then read the
-bucket), but whatever it picks comes from the seventeen primitives below and nothing else.
+bucket), but whatever it picks comes from the seventeen operations below and nothing else.
 
 Needs the agent extra — either `pip install "dale-engine[agent]"` or, in a clone,
 `uv sync --extra agent` — and one of `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` /
@@ -183,10 +183,10 @@ finds, or `DALE_MODEL` if you set one. Gemini is not currently supported because
 rejects DALE's recursive predicate type.
 
 **`engineering` is the answer; the note is not.** The model returns a `DaleResult` — a handle plus a
-one-sentence summary. The rows in `engineering` came out of DALE's own primitives; the note is LLM
+one-sentence summary. The rows in `engineering` came out of DALE's own operations; the note is LLM
 prose about them, and its wording varies from run to run.
 
-Primitives can also be called directly, with no model involved — `dale.call_primitive(registry,
+Operations can also be called directly, with no model involved — `dale.call_operation(registry,
 name, params)`, same validation and same cost gates. See `examples/05`–`07`.
 
 ### Reconcile service data with in-memory business data
@@ -310,29 +310,29 @@ A successful run produces data equivalent to:
 
 The original `orders` list is unchanged. DALE creates a new result by indexing the updates and
 discounts, joining them onto the existing orders, and applying declarative arithmetic. The model may
-choose the exact sequence, but it can only use DALE's validated primitives; it never writes or runs
+choose the exact sequence, but it can only use DALE's validated operations; it never writes or runs
 code against these records.
 
-## Primitive catalog
+## Operation catalog
 
-Every primitive is called through `dale.call_primitive(registry, name, params)`, which validates
-`params` against the primitive's schema, runs its cost estimator if it has one, and executes it —
-the same path the agent loop uses, not a shortcut test-only path. Every primitive that **creates a
+Every operation is called through `dale.call_operation(registry, name, params)`, which validates
+`params` against the operation's schema, runs its cost estimator if it has one, and executes it —
+the same path the agent loop uses, not a shortcut test-only path. Every operation that **creates a
 handle** takes two extra required params, `name` and `description` (as does `registry.create()`).
 `name` *becomes* the handle: it must be a valid Python identifier, and colliding with a live handle
 is an error, not a silent rename. `description` is mandatory too — and an honest "unknown,
 uninspected data" is a complete, encouraged answer when true.
 
-`dale.call_primitive()` returns a `PrimitiveOutput` (`.status`, `.handle`, `.result`, `.estimate`)
-whose `.handle` is a `HandleMeta` (`.handle`, `.kind`, `.size`, `.description`) — so the string id of
-a newly created handle is `out.handle.handle`. Primitives that create a handle set `.handle` and
-leave `.result` empty; inspection primitives (`peek`, `describe`) do the reverse; a refused operation
+`dale.call_operation()` returns an `OperationOutput` (`.status`, `.handle`, `.result`, `.estimate`)
+whose `.handle` is a `DataHandle` (`.name`, `.type`, `.size`, `.description`) — so the string id of
+a newly created handle is `out.handle.name`. Operations that create a handle set `.handle` and
+leave `.result` empty; inspection operations (`peek`, `describe`) do the reverse; a refused operation
 returns `status="cost_gate_exceeded"` with its `.estimate` and no handle at all.
 
-| Primitive | In → Out | Purpose |
+| Operation | In → Out | Purpose |
 |---|---|---|
 | `load_csv` | file → list | Load a local CSV into a `list` handle, with deterministic type inference. Takes a `file` — a virtual name registered on a `FileRegistry` ahead of time, never a raw path (see [`docs/environment.md`](docs/environment.md)) |
-| `load_json` | file → list \| dict | Load a local JSON file into a `list` handle (top-level array) or `dict` handle (top-level object) — JSON is a loading path, not a new handle kind. Same `file`-via-`FileRegistry` contract as `load_csv`. Optional `remove_envelope=True` unwraps a single-list-key envelope (e.g. Salesforce's `{"records": [...]}`) straight to a `list` handle — only when the model explicitly asserts it recognizes the shape; DALE never guesses this on its own. Nested structure is otherwise preserved as-is |
+| `load_json` | file → list \| dict | Load a local JSON file into a `list` handle (top-level array) or `dict` handle (top-level object) — JSON is a loading path, not a new handle type. Same `file`-via-`FileRegistry` contract as `load_csv`. Optional `remove_envelope=True` unwraps a single-list-key envelope (e.g. Salesforce's `{"records": [...]}`) straight to a `list` handle — only when the model explicitly asserts it recognizes the shape; DALE never guesses this on its own. Nested structure is otherwise preserved as-is |
 | `filter_where` | list → list | Keep records matching a predicate (comparisons, `and`/`or`/`not`) |
 | `compute_field` | list → list | Add a derived field (`add`/`subtract`/`multiply`/`divide` over fields or constants) |
 | `sort_by` | list → list | Stable multi-key sort, nulls sorted last |
@@ -357,9 +357,9 @@ it can't be out of date:
 import inspect
 import dale
 
-print(dale.list_primitives())
+print(dale.list_operations())
 
-spec = dale.get_primitive("window_flag")
+spec = dale.get_operation("window_flag")
 print(inspect.getdoc(spec.fn))
 
 schema = spec.param_schema.model_json_schema()
@@ -390,7 +390,7 @@ specific order matters.
 Read `model_json_schema()` itself (not just its keys) for types, enums, defaults, and the nested
 predicate grammar. It reports the **wire names** you actually pass — `window_flag`'s field is `as_`
 on the Python class but `as` in a call, and reading the schema rather than `model_fields` is what
-gets that right. On the spec: `cost_estimator` is `None` for primitives with no pre-execution
+gets that right. On the spec: `cost_estimator` is `None` for operations with no pre-execution
 estimate, and `bounded_by_input` marks the ones whose output provably can't exceed their input.
 
 Composite keys: `index_by`/`group_by` accept `key_fields: list[str]`. A single field produces a
@@ -409,7 +409,7 @@ for JSON, `flatten_json`'s multi-level `path` support, `load_jsonl`/`load_parque
 | `01_hello_world_memory.py` | An employee roster in memory. How many people are in Engineering, and who are they? | Shortest possible `dale.agent` setup — in-memory data, a one-line task. Start here before `04` |
 | `02_hello_world_file.py` | The same roster arrives as `people.csv`, and the answer has to land in another file. | The model calls `load_csv` and `export_handle` itself, against virtual names — it never sees or builds a real path on either end. Prints each step live |
 | `03_export_to_file.py` | Roster in memory, but the task asks for the result on disk rather than in the answer. | `export_handle` as the final action: DALE writes the rows straight to the file, and the result reports `exported_to` instead of a handle — the content never returns through the model's context |
-| `04_llm_orchestrated.py` | The same catalogue as `05`, but the pipeline is described in plain language instead of written out. | An LLM picks the primitives and parameters, never seeing the data and never writing code; each step is watched through the action log |
+| `04_llm_orchestrated.py` | The same catalogue as `05`, but the pipeline is described in plain language instead of written out. | An LLM picks the operations and parameters, never seeing the data and never writing code; each step is watched through the action log |
 | `05_filter_sort_compute.py` | A product catalogue with price, cost, and stock status. You want the in-stock items ranked by profit margin. | No LLM required. `filter_where`, `compute_field`, `sort_by`, `peek`, `describe`, `release_handle` |
 | `06_composite_key_join.py` | Two suppliers list overlapping SKUs, so a product is only identified by supplier *and* SKU together. Orders have to be priced against that pair. | No LLM required. `index_by`/`group_by` with multi-field (composite/tuple) keys, then `join_lookup` |
 | `07_cost_estimation_guardrail.py` | 10 records join against 10 tags that all share one key — 100 rows out, against a ceiling of 20. | No LLM required. **Start here for the safety story.** The join is refused *before* it runs, with an exact estimate (`estimated_rows: 100 (threshold: 20)`) and no handle created — then succeeds under an explicit `confirm=True` |
@@ -435,42 +435,42 @@ DALE_MODEL="openai:gpt-5.6" DALE_VERBOSITY=debug \
   uv run --env-file .env --extra agent python examples/02_hello_world_file.py
 ```
 
-## Extending the primitive catalog
+## Extending the operation catalog
 
-New primitives are registered **at build time by a developer**, never chosen or imported by the LLM
+New operations are registered **at build time by a developer**, never chosen or imported by the LLM
 at runtime — that boundary is the whole safety argument, so it is deliberate, not a gap.
-Built-in primitives use the exact same mechanism:
+Built-in operations use the exact same mechanism:
 
 ```python
 from pydantic import BaseModel
-from dale.catalog import primitive
-from dale.catalog import PrimitiveOutput
+from dale.catalog import operation
+from dale.catalog import OperationOutput
 
 class MyParams(BaseModel):
     handle: str
 
-@primitive("my_primitive", MyParams)
-def my_primitive(registry, params: MyParams) -> PrimitiveOutput:
+@operation("my_operation", MyParams)
+def my_operation(registry, params: MyParams) -> OperationOutput:
     ...
 ```
 
-If your primitive creates a handle, declare `creates_handle=True` and put `name: str` and
+If your operation creates a handle, declare `creates_handle=True` and put `name: str` and
 `description: str` on its param schema — that is how the agent layer knows to ask the model for
-them, without hardcoding a primitive-name list (`src/dale/catalog.py`). Pass a `cost_estimator=` to
+them, without hardcoding an operation-name list (`src/dale/catalog.py`). Pass a `cost_estimator=` to
 keep pre-execution cost estimation intact, or `bounded_by_input=True` if the output is provably no
 larger than the input.
 
 ## Development
 
 ```bash
-uv sync --extra dev --extra agent && uv run pytest -q   # 366 passed, 1 deselected
-uv sync --extra dev && uv run pytest -q                 # core only — 209 passed, 7 skipped
+uv sync --extra dev --extra agent && uv run pytest -q   # 389 passed, 1 deselected
+uv sync --extra dev && uv run pytest -q                 # core only — 229 passed, 7 skipped
 ```
 
 Both lines start with `uv sync`, deliberately: `uv sync` *replaces* the environment's extras, so it
 is the only way to reach a genuinely
 `pydantic_ai`-free env — `uv run --extra dev` alone will not remove a `pydantic_ai` an earlier sync
-installed, and reports the green 366 instead. That also means the second line uninstalls the agent
+installed, and reports the green 389 instead. That also means the second line uninstalls the agent
 extra; re-run the first to get it back. Name both extras when you want both: `uv sync --extra agent`
 on its own drops `pytest`.
 
@@ -479,8 +479,8 @@ Live tests that hit a real provider are deselected two ways — `addopts = "-m '
 spends money. `DALE_LIVE_TESTS=1 uv run --extra dev --extra agent pytest -m live` is the one
 deliberate way to run them; it needs `ANTHROPIC_API_KEY`.
 
-Tests are per module (`test_registry`, `test_grammar`, `test_errors`, `test_primitives_core`,
-`test_primitives_phase2`, `test_cost_estimation`, `test_baseline`, `test_dict_diff`, `test_files`,
+Tests are per module (`test_registry`, `test_grammar`, `test_errors`, `test_operations_core`,
+`test_operations_phase2`, `test_cost_estimation`, `test_baseline`, `test_dict_diff`, `test_files`,
 `test_flatten_json`, `test_priority_reduce`, `test_harness_usage`, `test_agent`, `test_agent_live`)
 with small isolated fixtures. `test_use_case_pipelines.py` is the deliberate exception: it runs the
 `DESIGN.md` §3 use cases end to end against `examples/data/`, asserting independently-computed
@@ -490,4 +490,4 @@ same way, and drives the full tool-call loop against PydanticAI's offline models
 structural verification.
 
 A paper covering the related work, mechanism, evaluation, and limitations in full is in
-preparation; it will be added to `paper/` when it is ready.
+preparation; it will be linked here when it is ready.

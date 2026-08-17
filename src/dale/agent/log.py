@@ -38,7 +38,7 @@ final leg of a run under "raw", since nothing else triggers after the last
 tool call). The quiet/normal/debug three-way split applies to
 ActionLog.render()'s post-hoc output via its own `debug` parameter; "raw" has
 no post-hoc equivalent there since it's about the live model exchange, not
-the primitive-call trace ActionLog itself records."""
+the operation-call trace ActionLog itself records."""
 
 
 def _render_raw_part(part: Any) -> str:
@@ -105,14 +105,14 @@ def _format_bytes(n: float) -> str:
 
 class HandleLabel(BaseModel):
     """Agent-layer log/display record for a handle's provenance — `handle`
-    itself IS the real DataRegistry identifier now (see HandleMeta), so
+    itself IS the real DataRegistry identifier now (see DataHandle), so
     there's no separate name to track here; this just carries what a step
     of the trace/registry-state table wants to show alongside it."""
 
     handle: str
     step: int
-    primitive: str
-    kind: str | None = None
+    operation: str
+    type: str | None = None
     size: int | None = None
     avg_record_bytes: int | None = None
     description: str | None = None
@@ -121,13 +121,13 @@ class HandleLabel(BaseModel):
 class ActionLogEntry(BaseModel):
     step: int
     intent: str
-    primitive: str
+    operation: str
     params: dict[str, Any]
     status: str
     result: dict[str, Any]
     # Host-side wall time for this step, split so DALE's own overhead can't
-    # hide inside the primitive's number. `elapsed_ms` is the
-    # dale.call_primitive call itself — the actual data processing;
+    # hide inside the operation's number. `elapsed_ms` is the
+    # dale.call_operation call itself — the actual data processing;
     # `auto_inspect_ms` is peek_at_every_step's extra peek/describe splice,
     # 0.0 when it didn't run. That feature is documented as costing no extra
     # turn and no extra log entry, which is true, but it isn't free in host
@@ -176,7 +176,7 @@ class ActionLog(BaseModel):
         self,
         *,
         intent: str,
-        primitive: str,
+        operation: str,
         params: dict[str, Any],
         result: dict[str, Any],
         elapsed_ms: float = 0.0,
@@ -186,7 +186,7 @@ class ActionLog(BaseModel):
         entry = ActionLogEntry(
             step=step,
             intent=intent,
-            primitive=primitive,
+            operation=operation,
             params=params,
             status=result.get("status", "unknown"),
             result=result,
@@ -197,18 +197,18 @@ class ActionLog(BaseModel):
         self.entries.append(entry)
 
         handle_meta = result.get("handle") if isinstance(result, dict) else None
-        if isinstance(handle_meta, dict) and "handle" in handle_meta:
-            handle_id = handle_meta["handle"]
+        if isinstance(handle_meta, dict) and "name" in handle_meta:
+            handle_id = handle_meta["name"]
             self.alive[handle_id] = HandleLabel(
                 handle=handle_id,
                 step=step,
-                primitive=primitive,
-                kind=handle_meta.get("kind"),
+                operation=operation,
+                type=handle_meta.get("type"),
                 size=handle_meta.get("size"),
                 avg_record_bytes=handle_meta.get("avg_record_bytes"),
                 description=handle_meta.get("description"),
             )
-        if primitive == "release_handle" and entry.status == "ok":
+        if operation == "release_handle" and entry.status == "ok":
             released = params.get("handle")
             if released is not None:
                 self.alive.pop(released, None)
@@ -218,11 +218,11 @@ class ActionLog(BaseModel):
 
     @property
     def total_host_ms(self) -> float:
-        """Host-side wall time across every logged call — primitive execution
+        """Host-side wall time across every logged call — operation execution
         plus peek_at_every_step's inspection overhead.
 
         Named for what it totals rather than for the field it starts from: the
-        per-entry `elapsed_ms` is primitive-only, so a `total_elapsed_ms` would
+        per-entry `elapsed_ms` is operation-only, so a `total_elapsed_ms` would
         invite the obvious-looking reimplementation `sum(e.elapsed_ms ...)`,
         which silently drops auto-inspect from the very split this exists to
         produce.
@@ -239,25 +239,25 @@ class ActionLog(BaseModel):
     def total_auto_inspect_ms(self) -> float:
         """The peek_at_every_step share of total_host_ms, on its own — so
         the cost of a convenience feature is attributable rather than folded
-        into the primitives it wraps."""
+        into the operations it wraps."""
         return sum(e.auto_inspect_ms for e in self.entries)
 
     def seed_from_registry(self, registry: dale.DataRegistry) -> None:
         """Register handles that exist before the agent's first tool call —
         e.g. CSV files or in-memory data an eval harness or invoker loaded
-        directly via dale.call_primitive, bypassing build_tools() entirely.
+        directly via dale.call_operation, bypassing build_tools() entirely.
         Without this, such handles are real and usable but invisible to
         render()'s registry-state listing, since they never went through
         record(). Call once, right after construction, before the agent
         runs."""
         for meta in registry.list_handles():
-            if meta.handle in self.alive:
+            if meta.name in self.alive:
                 continue
-            self.alive[meta.handle] = HandleLabel(
-                handle=meta.handle,
+            self.alive[meta.name] = HandleLabel(
+                handle=meta.name,
                 step=0,
-                primitive=meta.created_by,
-                kind=meta.kind,
+                operation=meta.created_by,
+                type=meta.type,
                 size=meta.size,
                 avg_record_bytes=meta.avg_record_bytes,
                 description=meta.description,
@@ -268,7 +268,7 @@ class ActionLog(BaseModel):
         Action line, a one-line Result status (with a concise error summary if
         the call failed), and Registry State. Pass `debug=True` for the full
         JSON-indented payload on every call, useful when you need to see
-        exactly what a primitive returned, not just that it succeeded."""
+        exactly what an operation returned, not just that it succeeded."""
         blocks = [
             f"{self._render_entry(e, debug=debug)}\n{self._render_registry_state(e.alive_after)}"
             for e in self.entries
@@ -277,18 +277,18 @@ class ActionLog(BaseModel):
 
     @classmethod
     def _render_entry(cls, e: ActionLogEntry, *, debug: bool = False) -> str:
-        """Call rendered as a single-line handle.primitive(args) signature —
-        most primitives are effectively a method call on a handle — with the
+        """Call rendered as a single-line handle.operation(args) signature —
+        most operations are effectively a method call on a handle — with the
         result as a separate, JSON-indented block. Two visually distinct
         pieces instead of one wrapped line of Python dict repr, which was
         hard to parse, especially for anything returning a multi-record
         sample (e.g. peek). The Result JSON body itself is opt-in
-        (`debug=True`): most of it (peek/describe samples, full HandleMeta
+        (`debug=True`): most of it (peek/describe samples, full DataHandle
         dumps) is exactly the kind of noise Registry State/the Action line
         already summarize; an error's code+message is still worth a
         one-liner even without debug, since "something failed" without why
         isn't useful."""
-        call = cls._render_call(e.primitive, cls._render_params(e.params))
+        call = cls._render_call(e.operation, cls._render_params(e.params))
         call = cls._render_assignment(e, call)
         timing = cls._render_timing(e)
         if debug:
@@ -325,7 +325,7 @@ class ActionLog(BaseModel):
         reach the Result block or Registry State further down — e.g.
         `people_list = load_csv(file='people.csv')` instead of a bare
         `load_csv(file='people.csv')` that never says what it produced.
-        `name` here is the handle's own real identifier (HandleMeta.handle),
+        `name` here is the handle's own real identifier (DataHandle.name),
         not a separate label — so unlike the pre-unification version of this
         method, there's no disambiguation to do: collisions are rejected
         outright at registry.create() time, so two alive handles can never
@@ -333,21 +333,21 @@ class ActionLog(BaseModel):
         if not isinstance(e.result, dict):
             return call
         handle_meta = e.result.get("handle")
-        if not isinstance(handle_meta, dict) or "handle" not in handle_meta:
+        if not isinstance(handle_meta, dict) or "name" not in handle_meta:
             return call
-        return f"{handle_meta['handle']} = {call}"
+        return f"{handle_meta['name']} = {call}"
 
     @classmethod
-    def _render_call(cls, primitive: str, params: dict[str, Any]) -> str:
-        """`handle.primitive(arg=val, ...)` when params has a natural
-        receiver, else `primitive(arg=val, ...)`. The receiver is the
+    def _render_call(cls, operation: str, params: dict[str, Any]) -> str:
+        """`handle.operation(arg=val, ...)` when params has a natural
+        receiver, else `operation(arg=val, ...)`. The receiver is the
         `handle` field if present; otherwise the first `*_handle` field in
         declared order (join_lookup/graph_walk_resolve have two — the first
-        one wins, the rest render as regular keyword args); primitives with
+        one wins, the rest render as regular keyword args); operations with
         no handle field at all (load_csv, which creates one rather than
         operating on one) get no receiver. A handle reference needs no
         annotation/lookup to be readable — it already IS the semantic name
-        (e.g. `people_list.peek(n=5)`) — since HandleMeta.handle and the
+        (e.g. `people_list.peek(n=5)`) — since DataHandle.name and the
         LLM-supplied name are the same field. `name`/`description` are
         dropped from the argument list: `name` already appears via the
         `= ` assignment prefix, and `description` is shown in REGISTRY
@@ -366,8 +366,8 @@ class ActionLog(BaseModel):
         }
         args = ", ".join(f"{k}={v!r}" for k, v in remaining.items())
         if receiver_key is not None:
-            return f"{params[receiver_key]}.{primitive}({args})"
-        return f"{primitive}({args})"
+            return f"{params[receiver_key]}.{operation}({args})"
+        return f"{operation}({args})"
 
     @classmethod
     def _render_registry_state(cls, alive: dict[str, HandleLabel]) -> str:
@@ -375,7 +375,7 @@ class ActionLog(BaseModel):
         instead of one densely punctuated line per handle. HANDLE is the
         real DataRegistry identifier — also what raw DaleError/dispatch
         output uses — and doubles as the semantic name now that the two are
-        unified; no separate NAME column. TYPE is the handle's kind
+        unified; no separate NAME column. TYPE is the handle's type
         (list/dict/set). MEMORY is `avg_record_bytes * size` (the same
         approximation cost.py's own estimator uses, see _format_bytes), "-"
         if unknown (e.g. an empty handle has no sample to estimate from).
@@ -391,7 +391,7 @@ class ActionLog(BaseModel):
         rows = [
             (
                 info.handle + (" *" if info.step == newest_step else ""),
-                info.kind or "-",
+                info.type or "-",
                 str(info.size) if info.size is not None else "-",
                 _format_bytes(info.avg_record_bytes * info.size)
                 if info.avg_record_bytes is not None and info.size is not None

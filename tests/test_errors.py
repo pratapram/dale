@@ -15,7 +15,7 @@ ERROR_CLASSES = [
     dale_errors.ToolCallLimitError,
     dale_errors.LoadError,
     dale_errors.InvalidParamsError,
-    dale_errors.PrimitiveNotFoundError,
+    dale_errors.OperationNotFoundError,
     dale_errors.InternalError,
 ]
 

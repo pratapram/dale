@@ -147,10 +147,11 @@ compatibility details.
 
 ## Docs
 
-- [Guide](GUIDE.md) — concepts, primitives, examples, extension points, and development
+- [Guide](GUIDE.md) — concepts, operations, examples, extension points, and development
 - [Design](DESIGN.md) — architecture, scope, and design rationale
 - [Agent integration](docs/agent.md) — model setup, execution, observability, and usage
 - [Environment and security](docs/environment.md) — deployment boundaries and resource controls
+- [Changelog](CHANGELOG.md) — release notes; **0.2.0 renames `primitive` → `operation` with no back-compat shims**
 
 ## License
 

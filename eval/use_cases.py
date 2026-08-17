@@ -25,7 +25,7 @@ def _load(registry: dale.DataRegistry, path: Path) -> str:
     assert registry.files is not None
     virtual_name = path.name
     registry.files.register(virtual_name, path)
-    out = dale.call_primitive(
+    out = dale.call_operation(
         registry,
         "load_csv",
         {
@@ -34,15 +34,15 @@ def _load(registry: dale.DataRegistry, path: Path) -> str:
             "description": f"data loaded from {virtual_name}",
         },
     )
-    return out.handle.handle
+    return out.handle.name
 
 
 def _alive_lists(registry: dale.DataRegistry):
     for meta in registry.list_handles():
-        if meta.kind != "list":
+        if meta.type != "list":
             continue
         try:
-            rows = registry.materialize(meta.handle)
+            rows = registry.materialize(meta.name)
         except Exception:
             continue
         if rows and isinstance(rows[0], dict):

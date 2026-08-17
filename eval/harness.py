@@ -28,7 +28,7 @@ Checker = Callable[[dale.DataRegistry, ActionLog, str], bool]
 def describe_setup(use_case_name: str, setup: UseCaseSetup, task: str) -> str:
     """The "story" of a use case, printed once before any trial runs: the
     task text, which virtual files are registered, what handles setup()
-    produces from them, and which primitives the model has to work with.
+    produces from them, and which operations the model has to work with.
     Runs setup() on a throwaway registry purely to describe the resulting
     state — every trial gets its own fresh registry built the same way."""
     registry = dale.DataRegistry(files=dale.FileRegistry())
@@ -49,8 +49,8 @@ def describe_setup(use_case_name: str, setup: UseCaseSetup, task: str) -> str:
         "STARTING STATE (handles the model will see):",
         *(f"  {line}" for line in registry_state_summary(registry).splitlines()),
         "",
-        "PRIMITIVES AVAILABLE:",
-        f"  {', '.join(dale.list_primitives())}",
+        "OPERATIONS AVAILABLE:",
+        f"  {', '.join(dale.list_operations())}",
     ]
     return "\n".join(lines)
 
@@ -89,7 +89,7 @@ class TrialSummary:
 
     @property
     def wasted_turn_rate(self) -> float:
-        """Fraction of logged primitive calls that were rejected (status ==
+        """Fraction of logged operation calls that were rejected (status ==
         "error") — the metric the evaluation pilot added to test whether a
         closed, schema-validated action space produces fewer wasted turns
         from bad emissions than free-form code generation. `cost_gate_exceeded`
@@ -143,7 +143,7 @@ class TrialSummary:
         ones: elapsed time is real regardless of which model produced it.
         The interesting output is the host share, which is normally a rounding
         error — the point of measuring it is that it stays one as datasets
-        grow, since a primitive's cost scales with rows while a round trip
+        grow, since an operation's cost scales with rows while a round trip
         doesn't."""
         timed = [r for r in self.results if r.wall_clock_s > 0]
         if not timed:
@@ -162,7 +162,7 @@ class TrialSummary:
     def failure_mode_counts(self) -> Counter:
         """Error codes seen across all trials, most common first — the
         categorization DESIGN.md's evaluation design calls for
-        (wrong primitive, malformed predicate, wrong threshold, ...)."""
+        (wrong operation, malformed predicate, wrong threshold, ...)."""
         counts: Counter = Counter()
         for r in self.results:
             for e in r.action_log.entries:
@@ -241,7 +241,7 @@ def run_trial(
     max_steps_per_call: int | None = None,
     usage_limits: Any | None = None,
 ) -> TrialResult:
-    """`max_steps_per_call=1` runs the same use case one primitive per round
+    """`max_steps_per_call=1` runs the same use case one operation per round
     trip — paired with TokenUsage.requests, that's paper.md Section 4.2 part
     (F)'s request-count comparison against the unrestricted default, needing no
     other mechanism. It replaces the old `enable_run_plan=False`: there is no

@@ -17,7 +17,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from dale.catalog import PrimitiveOutput, primitive
+from dale.catalog import OperationOutput, operation
 from dale.errors import FieldCollisionError, InvalidParamsError, TypeMismatchError
 from dale.registry import DataRegistry
 
@@ -65,18 +65,18 @@ def _explode_record(
     return rows
 
 
-@primitive("flatten_json", FlattenJsonParams, creates_handle=True)
-def flatten_json(registry: DataRegistry, params: FlattenJsonParams) -> PrimitiveOutput:
+@operation("flatten_json", FlattenJsonParams, creates_handle=True)
+def flatten_json(registry: DataRegistry, params: FlattenJsonParams) -> OperationOutput:
     """Explode a nested array field into one row per element, carrying
     selected parent fields down onto each row. A record whose path field is
     absent, null, or an empty array contributes zero rows — not an error;
     this is what makes "skip records with nothing to explode" free. Only a
     single-element path is supported today. Returns a new list handle."""
     meta = registry.meta(params.handle)
-    if meta.kind != "list":
+    if meta.type != "list":
         raise TypeMismatchError(
-            f"flatten_json requires a list handle, got {meta.kind!r}",
-            details={"handle": params.handle, "kind": meta.kind},
+            f"flatten_json requires a list handle, got {meta.type!r}",
+            details={"handle": params.handle, "type": meta.type},
         )
     if len(params.path) != 1:
         raise InvalidParamsError(
@@ -99,4 +99,4 @@ def flatten_json(registry: DataRegistry, params: FlattenJsonParams) -> Primitive
         created_by="flatten_json",
         source_handles=[params.handle],
     )
-    return PrimitiveOutput(status="ok", handle=new_meta)
+    return OperationOutput(status="ok", handle=new_meta)

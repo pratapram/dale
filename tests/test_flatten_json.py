@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from dale.dispatch import call_primitive
+from dale.dispatch import call_operation
 from dale.errors import FieldCollisionError, InvalidParamsError, TypeMismatchError
 from dale.registry import DataRegistry
 
@@ -30,7 +30,7 @@ def _load_records(registry, records, created_by="fixture"):
 
 
 def _flatten(registry, handle, path, carry_fields=None, **extra):
-    return call_primitive(
+    return call_operation(
         registry,
         "flatten_json",
         {
@@ -61,9 +61,9 @@ def test_basic_explode(registry):
             }
         ],
     )
-    out = _flatten(registry, meta.handle, path=["labels"], carry_fields=["number", "title"])
+    out = _flatten(registry, meta.name, path=["labels"], carry_fields=["number", "title"])
     assert out.status == "ok"
-    rows = registry.materialize(out.handle.handle)
+    rows = registry.materialize(out.handle.name)
     assert rows == [
         {"number": 66594, "title": "BUG: read_csv ...", "id": 1, "name": "Bug", "color": "e10c02"},
         {
@@ -88,8 +88,8 @@ def test_mixed_populated_and_empty_records(registry):
             {"number": 3, "labels": [{"name": "Docs"}]},
         ],
     )
-    out = _flatten(registry, meta.handle, path=["labels"], carry_fields=["number"])
-    rows = registry.materialize(out.handle.handle)
+    out = _flatten(registry, meta.name, path=["labels"], carry_fields=["number"])
+    rows = registry.materialize(out.handle.name)
     assert rows == [{"number": 1, "name": "Bug"}, {"number": 3, "name": "Docs"}]
 
 
@@ -104,8 +104,8 @@ def test_field_absent_on_some_records_contributes_zero_rows(registry):
             {"number": 2},  # no "labels" key at all — e.g. like pull_request on a plain issue
         ],
     )
-    out = _flatten(registry, meta.handle, path=["labels"], carry_fields=["number"])
-    rows = registry.materialize(out.handle.handle)
+    out = _flatten(registry, meta.name, path=["labels"], carry_fields=["number"])
+    rows = registry.materialize(out.handle.name)
     assert rows == [{"number": 1, "name": "Bug"}]
 
 
@@ -115,7 +115,7 @@ def test_field_absent_on_some_records_contributes_zero_rows(registry):
 def test_field_wrong_type_raises(registry):
     meta = _load_records(registry, [{"number": 1, "labels": "not-a-list"}])
     with pytest.raises(TypeMismatchError):
-        _flatten(registry, meta.handle, path=["labels"])
+        _flatten(registry, meta.name, path=["labels"])
 
 
 # --- 5/6. invalid path shapes ------------------------------------------------
@@ -124,13 +124,13 @@ def test_field_wrong_type_raises(registry):
 def test_multi_element_path_raises(registry):
     meta = _load_records(registry, [{"a": {"b": []}}])
     with pytest.raises(InvalidParamsError):
-        _flatten(registry, meta.handle, path=["a", "b"])
+        _flatten(registry, meta.name, path=["a", "b"])
 
 
 def test_empty_path_raises(registry):
     meta = _load_records(registry, [{"labels": []}])
     with pytest.raises(InvalidParamsError):
-        _flatten(registry, meta.handle, path=[])
+        _flatten(registry, meta.name, path=[])
 
 
 # --- 7. carry_fields naming a missing parent field --------------------------
@@ -138,8 +138,8 @@ def test_empty_path_raises(registry):
 
 def test_carry_field_missing_on_parent_is_silently_skipped(registry):
     meta = _load_records(registry, [{"number": 1, "labels": [{"name": "Bug"}]}])
-    out = _flatten(registry, meta.handle, path=["labels"], carry_fields=["number", "title"])
-    rows = registry.materialize(out.handle.handle)
+    out = _flatten(registry, meta.name, path=["labels"], carry_fields=["number", "title"])
+    rows = registry.materialize(out.handle.name)
     assert rows == [{"number": 1, "name": "Bug"}]  # "title" silently absent, no error
 
 
@@ -151,18 +151,18 @@ def test_carry_field_collision_with_child_field_raises(registry):
         registry, [{"id": 66594, "labels": [{"id": 1, "name": "Bug"}]}]
     )
     with pytest.raises(FieldCollisionError):
-        _flatten(registry, meta.handle, path=["labels"], carry_fields=["id"])
+        _flatten(registry, meta.name, path=["labels"], carry_fields=["id"])
 
 
-# --- 9. wrong handle kind ----------------------------------------------------
+# --- 9. wrong handle type ----------------------------------------------------
 
 
-def test_wrong_handle_kind_raises(registry):
+def test_wrong_handle_type_raises(registry):
     meta = registry.create(
         "dict", {"a": 1}, name=_fixture_name(), description="d", created_by="fixture"
     )
     with pytest.raises(TypeMismatchError):
-        _flatten(registry, meta.handle, path=["labels"])
+        _flatten(registry, meta.name, path=["labels"])
 
 
 # --- 10. array of non-dict elements -----------------------------------------
@@ -171,7 +171,7 @@ def test_wrong_handle_kind_raises(registry):
 def test_array_of_non_dict_elements_raises(registry):
     meta = _load_records(registry, [{"number": 1, "keywords": ["flask", "python", "web"]}])
     with pytest.raises(TypeMismatchError):
-        _flatten(registry, meta.handle, path=["keywords"])
+        _flatten(registry, meta.name, path=["keywords"])
 
 
 # --- 11. integration test against real, committed data ----------------------
@@ -184,7 +184,7 @@ def test_real_github_issues_label_explosion(registry):
     path = DATA_DIR / "pandas_issues.json"
     assert registry.files is not None
     registry.files.register("pandas_issues.json", path)
-    loaded = call_primitive(
+    loaded = call_operation(
         registry,
         "load_json",
         {"file": "pandas_issues.json", "name": "pandas_issues", "description": "d"},
@@ -192,11 +192,11 @@ def test_real_github_issues_label_explosion(registry):
 
     out = _flatten(
         registry,
-        loaded.handle.handle,
+        loaded.handle.name,
         path=["labels"],
         carry_fields=["number", "title"],
     )
-    rows = registry.materialize(out.handle.handle)
+    rows = registry.materialize(out.handle.name)
 
     # Only issue #66594 has any labels in this real snapshot — everything
     # else contributes zero rows.
@@ -208,21 +208,21 @@ def test_real_github_issues_label_explosion(registry):
 
 def test_real_github_issues_dispatch_end_to_end(registry):
     """Same real fixture, but every step (including flatten_json itself)
-    routed through dale.call_primitive with a raw params dict, matching how
+    routed through dale.call_operation with a raw params dict, matching how
     an LLM tool call would actually shape the request."""
     path = DATA_DIR / "pandas_issues.json"
     assert registry.files is not None
     registry.files.register("pandas_issues.json", path)
-    loaded = call_primitive(
+    loaded = call_operation(
         registry,
         "load_json",
         {"file": "pandas_issues.json", "name": "issues", "description": "pandas issues"},
     )
-    out = call_primitive(
+    out = call_operation(
         registry,
         "flatten_json",
         {
-            "handle": loaded.handle.handle,
+            "handle": loaded.handle.name,
             "path": ["labels"],
             "carry_fields": ["number", "title"],
             "name": "issue_labels",
@@ -230,6 +230,6 @@ def test_real_github_issues_dispatch_end_to_end(registry):
         },
     )
     assert out.status == "ok"
-    assert out.handle.handle == "issue_labels"
-    rows = registry.materialize(out.handle.handle)
+    assert out.handle.name == "issue_labels"
+    rows = registry.materialize(out.handle.name)
     assert len(rows) == 2

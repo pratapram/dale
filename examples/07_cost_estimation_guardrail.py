@@ -32,23 +32,23 @@ tags = registry.create(
     description="tags for that category",
     created_by="example_script",
 )
-tag_groups = dale.call_primitive(
+tag_groups = dale.call_operation(
     registry,
     "group_by",
     {
-        "handle": tags.handle,
+        "handle": tags.name,
         "key_fields": ["category"],
         "name": "tag_groups",
         "description": "tags bucketed by category",
     },
 )
 
-result = dale.call_primitive(
+result = dale.call_operation(
     registry,
     "join_lookup",
     {
-        "base_handle": base.handle,
-        "index_handle": tag_groups.handle.handle,
+        "base_handle": base.name,
+        "index_handle": tag_groups.handle.name,
         "on": ["category"],
         "how": "inner",
         "name": "joined",
@@ -65,12 +65,12 @@ print(f"handles in registry right now: {registry.handle_count()} "
 # Explicit confirm=True proceeds anyway. The resulting handle's actual size
 # matches the earlier estimate exactly — this is the "exact for row count"
 # property the estimator provides, not an approximation.
-confirmed = dale.call_primitive(
+confirmed = dale.call_operation(
     registry,
     "join_lookup",
     {
-        "base_handle": base.handle,
-        "index_handle": tag_groups.handle.handle,
+        "base_handle": base.name,
+        "index_handle": tag_groups.handle.name,
         "on": ["category"],
         "how": "inner",
         "confirm": True,

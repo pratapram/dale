@@ -5,7 +5,7 @@ Run ONCE, on the two-tool-surface tree, *before* `run_plan` becomes the only too
 `paper.md` Section 3.12 claims a batched call is indistinguishable in the resulting
 trace from the same call issued on its own turn, and `agent.py`'s own docstrings
 (`_execute_and_log_step`, `_call_params`) restate it as the reason both surfaces
-share one choke point. Nothing ever asserted it. Once the standalone per-primitive
+share one choke point. Nothing ever asserted it. Once the standalone per-operation
 tools are gone there is no second surface left to compare against, so the claim
 becomes unassertable unless the "before" side is frozen first — which is what this
 does.
@@ -26,7 +26,7 @@ preserve, so don't — unless the trace format is being changed on purpose, in w
 case the diff is the review artifact.
 
 That is now enforced by construction as well as by this paragraph: the pipelines
-below drive the named per-primitive tools, which `build_tools` no longer returns,
+below drive the named per-operation tools, which `build_tools` no longer returns,
 so `main()` raises rather than silently overwriting the frozen files. What still
 works, and is what the regression test imports, is `_PRODUCTS` and the two
 normalizers — deliberately shared rather than reimplemented in the test, so the
@@ -76,10 +76,10 @@ def _caller(tools):
         def __init__(self, registry):
             self.deps = registry
 
-    # Positional-only: handle-creating primitives take their own `name` kwarg,
+    # Positional-only: handle-creating operations take their own `name` kwarg,
     # which would otherwise collide with the tool name.
-    def call(registry, primitive, /, **kwargs):
-        tool = by_name[primitive]
+    def call(registry, operation, /, **kwargs):
+        tool = by_name[operation]
         params_model = inspect.signature(tool.function).parameters["params"].annotation
         return tool.function(_Ctx(registry), params_model(**kwargs))
 
@@ -129,7 +129,7 @@ def four_step_pipeline() -> ActionLog:
 def one_step_pipeline() -> ActionLog:
     """The length-1 case, frozen separately.
 
-    After the change a single primitive call is a `steps` list of one, and this is
+    After the change a single operation call is a `steps` list of one, and this is
     what it has to reproduce — the claim being that batching of size 1 is not a
     special case but the trivial case.
     """

@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from dale.catalog import PrimitiveOutput, primitive
+from dale.catalog import OperationOutput, operation
 from dale.registry import DataRegistry
 
 _PEEK_MAX_N = 50
@@ -270,7 +270,7 @@ def _sample_dict(
     entry giving how many keys were not shown. It is not cosmetic: for buckets
     a missing count costs the model a size estimate, but for keys it costs it
     the answer, since "there are 3 regions" is a conclusion a 3-of-1000-key
-    sample invites and DALE's own metadata (HandleMeta.size) contradicts."""
+    sample invites and DALE's own metadata (DataHandle.size) contradicts."""
     n = max(0, min(n, _PEEK_MAX_N))
     # islice, not list(value.keys())[:n] -- the slice materialized the entire
     # keyspace to throw all but n of it away: 4.2 ms on a 1M-key dict against
@@ -306,8 +306,8 @@ def _sample_dict(
     return sample, truncated
 
 
-@primitive("peek", PeekParams)
-def peek(registry: DataRegistry, params: PeekParams) -> PrimitiveOutput:
+@operation("peek", PeekParams)
+def peek(registry: DataRegistry, params: PeekParams) -> OperationOutput:
     """Return a small sample of a handle — a sanity check on shape and fields,
     never a way to read the data. The sample is capped at 50 items and, hard,
     at 4 KB serialized, whatever the handle holds and however deeply it nests;
@@ -317,7 +317,7 @@ def peek(registry: DataRegistry, params: PeekParams) -> PrimitiveOutput:
     keys are missing, a shortened string ends with `"...(+N more chars)"`, and
     `"truncated": true` appears alongside the sample. So a sample never
     understates what is there — read those markers as "this collection is
-    larger than what you are seeing", and use the primitives to process data
+    larger than what you are seeing", and use the operations to process data
     rather than peek to read it. Under `privacy_mode`, values are redacted to
     type placeholders and dict keys to positions rather than the call being
     refused — it still shows shape, just never content, and never the counts
@@ -327,7 +327,7 @@ def peek(registry: DataRegistry, params: PeekParams) -> PrimitiveOutput:
     value = registry.get(params.handle)
     redact = registry.privacy_mode
 
-    if meta.kind == "dict":
+    if meta.type == "dict":
         sample, truncated = _sample_dict(value, n, _PEEK_MAX_BYTES, redact=redact)
     else:
         # Sliced to n *before* fitting, so the ordinary "you asked for 3 of
@@ -335,12 +335,12 @@ def peek(registry: DataRegistry, params: PeekParams) -> PrimitiveOutput:
         # it's peek answering what was asked, and the handle's full size is
         # already in the metadata the model has. A marker here means the bytes
         # ran out, which is the thing it can't otherwise know.
-        items = value[:n] if meta.kind == "list" else list(islice(value, n))
+        items = value[:n] if meta.type == "list" else list(islice(value, n))
         sample, _, truncated = _fit(items, _PEEK_MAX_BYTES, max_items=n, redact=redact)
 
     result: dict[str, Any] = {
         "handle": params.handle,
-        "kind": meta.kind,
+        "type": meta.type,
         "requested_n": params.n,
         "sample": sample,
     }
@@ -349,7 +349,7 @@ def peek(registry: DataRegistry, params: PeekParams) -> PrimitiveOutput:
     if redact:
         result["note"] = "privacy_mode is enabled: values redacted to type placeholders"
 
-    return PrimitiveOutput(status="ok", result=result)
+    return OperationOutput(status="ok", result=result)
 
 
 class DescribeParams(BaseModel):
@@ -370,11 +370,11 @@ def _records_from_handle(registry: DataRegistry, handle: str) -> list[Any]:
     meta = registry.meta(handle)
     value = registry.get(handle)
 
-    if meta.kind == "list":
+    if meta.type == "list":
         return value
-    if meta.kind == "dict":
+    if meta.type == "dict":
         values = list(value.values())
-        if meta.value_shape == "list":
+        if meta.value_shape == "many":
             flattened: list[Any] = []
             for bucket in values:
                 flattened.extend(bucket if isinstance(bucket, list) else [bucket])
@@ -383,8 +383,8 @@ def _records_from_handle(registry: DataRegistry, handle: str) -> list[Any]:
     return [{"value": v} for v in value]  # set
 
 
-@primitive("describe", DescribeParams)
-def describe(registry: DataRegistry, params: DescribeParams) -> PrimitiveOutput:
+@operation("describe", DescribeParams)
+def describe(registry: DataRegistry, params: DescribeParams) -> OperationOutput:
     """Aggregate statistics for a field: min/max/mean/null-rate for numeric
     fields, distinct-count/top-k for categorical ones. With no field given,
     returns a schema summary (field names and inferred types) instead of
@@ -402,7 +402,7 @@ def describe(registry: DataRegistry, params: DescribeParams) -> PrimitiveOutput:
             for k, v in record.items():
                 if k not in fields and v is not None:
                     fields[k] = type(v).__name__
-        return PrimitiveOutput(status="ok", result={"handle": params.handle, "fields": fields})
+        return OperationOutput(status="ok", result={"handle": params.handle, "fields": fields})
 
     all_values = [r.get(params.field) for r in records if isinstance(r, dict)]
     non_null = [v for v in all_values if v is not None]
@@ -413,7 +413,7 @@ def describe(registry: DataRegistry, params: DescribeParams) -> PrimitiveOutput:
     ):
         stats = _numeric_stats(non_null)
         stats["null_rate"] = null_rate
-        return PrimitiveOutput(
+        return OperationOutput(
             status="ok", result={"handle": params.handle, "field": params.field, **stats}
         )
 
@@ -452,4 +452,4 @@ def describe(registry: DataRegistry, params: DescribeParams) -> PrimitiveOutput:
         if truncated:
             result["truncated"] = True
 
-    return PrimitiveOutput(status="ok", result=result)
+    return OperationOutput(status="ok", result=result)

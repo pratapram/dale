@@ -39,7 +39,7 @@ Was `Any` until a live OpenAI run rejected every DALE tool outright:
 `{"title": "Const"}` — no `type`, no `anyOf` — which is legal JSON Schema
 ("any value") but which OpenAI's function-schema validator deliberately
 refuses. That refusal is enforced at request time against the whole tool
-list, so all three affected primitives (filter_where/window_flag via
+list, so all three affected operations (filter_where/window_flag via
 Comparison, compute_field via ConstRef) took every other tool down with
 them, before a single token of inference.
 
@@ -130,7 +130,7 @@ Not.model_rebuild()
 def render_predicate(predicate: Predicate) -> str:
     """Human-readable infix rendering of a Predicate tree — e.g. for
     reviewing what an LLM actually constructed instead of reading the raw
-    nested dict/JSON it produced. Not used by matches() or any primitive;
+    nested dict/JSON it produced. Not used by matches() or any operation;
     a debugging/audit aid only."""
     if isinstance(predicate, Comparison):
         return f"{predicate.field} {predicate.op} {predicate.value!r}"
@@ -147,7 +147,7 @@ def render_predicate(predicate: Predicate) -> str:
 
 def matches(record: dict[str, Any], predicate: Predicate) -> bool:
     """Evaluate a predicate against a record. The single evaluator reused by
-    every predicate-consuming primitive (filter_where now; window_flag and
+    every predicate-consuming operation (filter_where now; window_flag and
     graph_walk_resolve later)."""
     if isinstance(predicate, Comparison):
         return _match_comparison(record, predicate)

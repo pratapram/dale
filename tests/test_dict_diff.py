@@ -7,7 +7,7 @@ import itertools
 
 import pytest
 
-from dale.dispatch import call_primitive
+from dale.dispatch import call_operation
 from dale.errors import TypeMismatchError
 from dale.registry import DataRegistry
 
@@ -25,7 +25,7 @@ def _load_dict(registry, data, created_by="fixture"):
 
 
 def _diff(registry, current_handle, previous_handle, **extra):
-    return call_primitive(
+    return call_operation(
         registry,
         "dict_diff",
         {
@@ -62,9 +62,9 @@ def test_the_worked_example_all_four_statuses(registry):
             "frank@co.com": "bronze",
         },
     )
-    out = _diff(registry, current.handle, previous.handle)
+    out = _diff(registry, current.name, previous.name)
     assert out.status == "ok"
-    rows = _by_key(registry.materialize(out.handle.handle))
+    rows = _by_key(registry.materialize(out.handle.name))
 
     assert rows["bob@co.com"] == {
         "key": "bob@co.com", "status": "new", "previous_value": None, "current_value": "gold"
@@ -88,15 +88,15 @@ def test_the_worked_example_all_four_statuses(registry):
 def test_both_empty(registry):
     current = _load_dict(registry, {})
     previous = _load_dict(registry, {})
-    out = _diff(registry, current.handle, previous.handle)
-    assert registry.materialize(out.handle.handle) == []
+    out = _diff(registry, current.name, previous.name)
+    assert registry.materialize(out.handle.name) == []
 
 
 def test_completely_disjoint(registry):
     current = _load_dict(registry, {"a": 1})
     previous = _load_dict(registry, {"b": 2})
-    out = _diff(registry, current.handle, previous.handle)
-    rows = _by_key(registry.materialize(out.handle.handle))
+    out = _diff(registry, current.name, previous.name)
+    rows = _by_key(registry.materialize(out.handle.name))
     assert rows["a"]["status"] == "new"
     assert rows["b"]["status"] == "removed"
 
@@ -104,16 +104,16 @@ def test_completely_disjoint(registry):
 def test_identical_dicts_all_unchanged(registry):
     current = _load_dict(registry, {"a": 1, "b": 2})
     previous = _load_dict(registry, {"a": 1, "b": 2})
-    out = _diff(registry, current.handle, previous.handle)
-    rows = registry.materialize(out.handle.handle)
+    out = _diff(registry, current.name, previous.name)
+    rows = registry.materialize(out.handle.name)
     assert all(r["status"] == "unchanged" for r in rows)
     assert len(rows) == 2
 
 
-def test_wrong_handle_kind_raises(registry):
+def test_wrong_handle_type_raises(registry):
     current = registry.create(
         "list", [1, 2], name=_fixture_name(), description="d", created_by="fixture"
     )
     previous = _load_dict(registry, {"a": 1})
     with pytest.raises(TypeMismatchError):
-        _diff(registry, current.handle, previous.handle)
+        _diff(registry, current.name, previous.name)

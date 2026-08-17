@@ -107,7 +107,7 @@ def test_usage_unavailable_for_synthetic_models():
                 parts=[
                     ToolCallPart(
                         "run_plan",
-                        {"steps": [{"primitive": "peek", "handle": "items", "intent": "look"}]},
+                        {"steps": [{"operation": "peek", "handle": "items", "intent": "look"}]},
                     )
                 ]
             )
@@ -118,7 +118,7 @@ def test_usage_unavailable_for_synthetic_models():
     outcome = run_agent(agent, "do something", deps=registry, action_log=log, verbosity="quiet")
 
     assert outcome.success
-    assert len(log.entries) == 1  # the step really ran, through dale.call_primitive
+    assert len(log.entries) == 1  # the step really ran, through dale.call_operation
     assert outcome.usage.available is False
     assert outcome.usage.render() == ""
 
@@ -206,7 +206,7 @@ def test_per_call_timing_is_recorded_and_summed(registry):
         params_model(
             steps=[
                 {
-                    "primitive": "filter_where",
+                    "operation": "filter_where",
                     "intent": "keep evens",
                     "handle": "rows",
                     "predicate": {"field": "keep", "op": "==", "value": True},
@@ -220,7 +220,7 @@ def test_per_call_timing_is_recorded_and_summed(registry):
     entry = log.entries[-1]
     assert entry.elapsed_ms > 0
     # peek_at_every_step defaults on, so the splice is attributed separately
-    # rather than inflating the primitive's own number.
+    # rather than inflating the operation's own number.
     assert entry.auto_inspect_ms > 0
     assert log.total_host_ms == pytest.approx(entry.elapsed_ms + entry.auto_inspect_ms)
     assert log.total_auto_inspect_ms == pytest.approx(entry.auto_inspect_ms)
@@ -239,7 +239,7 @@ def test_auto_inspect_time_is_zero_when_the_feature_is_off(registry):
         params_model(
             steps=[
                 {
-                    "primitive": "sort_by",
+                    "operation": "sort_by",
                     "intent": "sort",
                     "handle": "rows",
                     "keys": [{"field": "a"}],
@@ -259,14 +259,14 @@ def test_timing_renders_on_the_result_line():
     from dale.agent import ActionLogEntry
 
     e = ActionLogEntry(
-        step=1, intent="i", primitive="filter_where", params={"handle": "h"},
+        step=1, intent="i", operation="filter_where", params={"handle": "h"},
         status="ok", result={"status": "ok"}, elapsed_ms=1.34, auto_inspect_ms=0.42,
     )
     assert "(1.3 ms + 0.4 ms inspect)" in ActionLog._render_entry(e)
 
     # An unmeasured entry renders nothing rather than a misleading "0.0 ms".
     bare = ActionLogEntry(
-        step=1, intent="i", primitive="peek", params={"handle": "h"},
+        step=1, intent="i", operation="peek", params={"handle": "h"},
         status="ok", result={"status": "ok"},
     )
     assert "ms" not in ActionLog._render_entry(bare)
@@ -275,7 +275,7 @@ def test_timing_renders_on_the_result_line():
 def test_summary_timing_split():
     log = ActionLog()
     log.record(
-        intent="i", primitive="filter_where", params={}, result={"status": "ok"},
+        intent="i", operation="filter_where", params={}, result={"status": "ok"},
         elapsed_ms=3.0, auto_inspect_ms=1.0,
     )
     r = TrialResult(

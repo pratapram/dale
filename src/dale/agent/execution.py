@@ -1,7 +1,7 @@
-"""Running one primitive call, and deciding when a run should stop.
+"""Running one operation call, and deciding when a run should stop.
 
-`_execute_and_log_step` is the single choke point every primitive call goes
-through — the real `dale.call_primitive` path, plus `peek_at_every_step`'s
+`_execute_and_log_step` is the single choke point every operation call goes
+through — the real `dale.call_operation` path, plus `peek_at_every_step`'s
 auto_inspect splice, the repetition nudge, the action-log entry and the live
 print. It was extracted so a call arriving as part of a batch is
 indistinguishable in the resulting trace from one issued on its own; now that
@@ -60,17 +60,17 @@ class AgentLoopTerminated(Exception):
     """
 
     def __init__(
-        self, message: str, *, code: str, primitive: str, attempts: int | None = None
+        self, message: str, *, code: str, operation: str, attempts: int | None = None
     ) -> None:
         super().__init__(message)
         self.message = message
         self.code = code
-        self.primitive = primitive
+        self.operation = operation
         self.attempts = attempts
 
 
 _REPETITION_NUDGE_THRESHOLD = 2
-"""How many prior, identical, failed attempts (same primitive, same params,
+"""How many prior, identical, failed attempts (same operation, same params,
 status != "ok") trigger a repetition nudge on the next one — i.e. the nudge
 first appears on the 3rd attempt. Matches Tier-1 stuck-detection
 design ("nudge after 2-3 repeats"). Not exposed as a public parameter, same
@@ -79,7 +79,7 @@ per-deployment knob yet."""
 
 _REPETITION_LIMIT_DEFAULT = 5
 """Default `repetition_limit`: how many identical failed attempts (same
-primitive, same params) end the run outright, via AgentLoopTerminated.
+operation, same params) end the run outright, via AgentLoopTerminated.
 
 Must stay strictly greater than _REPETITION_NUDGE_THRESHOLD + 1, so the model
 always gets at least one explicit warning quoting the real error before it's
@@ -156,9 +156,9 @@ def _validate_repetition_limit(repetition_limit: int | None) -> None:
 
 
 def _count_prior_identical_failures(
-    action_log: ActionLog, primitive: str, call_params: dict[str, Any]
+    action_log: ActionLog, operation: str, call_params: dict[str, Any]
 ) -> int:
-    """How many times this exact (primitive, params) pair has already failed
+    """How many times this exact (operation, params) pair has already failed
     (or hit cost_gate_exceeded) anywhere earlier in this run's log — not just
     consecutively, so a `peek` or other call interleaved between two
     identical failing attempts still counts them as repetition. This is the
@@ -168,11 +168,11 @@ def _count_prior_identical_failures(
     return sum(
         1
         for e in action_log.entries
-        if e.primitive == primitive and e.params == call_params and e.status != "ok"
+        if e.operation == operation and e.params == call_params and e.status != "ok"
     )
 
 
-def _repetition_nudge_text(primitive: str, payload: dict[str, Any], attempt_number: int) -> str:
+def _repetition_nudge_text(operation: str, payload: dict[str, Any], attempt_number: int) -> str:
     """Quotes DALE's own already-known error back at the model explicitly —
     Tier 1 of the stuck-detection design: DALE already has the
     theoretical reason (the error itself), so no model reasoning or new
@@ -196,7 +196,7 @@ def _repetition_nudge_text(primitive: str, payload: dict[str, Any], attempt_numb
     they'd drift."""
     if payload.get("status") == "cost_gate_exceeded":
         return (
-            f"You have now made this exact {primitive} call {attempt_number} times, and the "
+            f"You have now made this exact {operation} call {attempt_number} times, and the "
             f"cost-estimate gate refused it every time because you never set confirm=True. "
             f"Sending it again unchanged will be refused again. Either resend it with "
             f"confirm=True to accept the estimated cost, or make the operation smaller."
@@ -204,13 +204,13 @@ def _repetition_nudge_text(primitive: str, payload: dict[str, Any], attempt_numb
     code = payload.get("code", "UNKNOWN")
     message = payload.get("message", "")
     return (
-        f"You have now made this exact {primitive} call {attempt_number} times, and it failed "
+        f"You have now made this exact {operation} call {attempt_number} times, and it failed "
         f"identically every time: {code} — {message}. Repeating the same call again will not "
         f"produce a different result. Try a genuinely different approach or different parameters."
     )
 
 
-def _repetition_stop_message(primitive: str, payload: dict[str, Any], attempt_number: int) -> str:
+def _repetition_stop_message(operation: str, payload: dict[str, Any], attempt_number: int) -> str:
     """The same distinction _repetition_nudge_text draws, for the message that
     ends the run — the post-mortem's one-line account of why it stopped, and
     the only text a caller catching AgentLoopTerminated ever sees. It's worth
@@ -220,11 +220,11 @@ def _repetition_stop_message(primitive: str, payload: dict[str, Any], attempt_nu
     an expensive operation and never confirmed it."""
     if payload.get("status") == "cost_gate_exceeded":
         return (
-            f"stopped after {attempt_number} identical {primitive} calls that the "
+            f"stopped after {attempt_number} identical {operation} calls that the "
             f"cost-estimate gate refused: confirm=True was never set"
         )
     return (
-        f"stopped after {attempt_number} identical failed {primitive} calls: "
+        f"stopped after {attempt_number} identical failed {operation} calls: "
         f"{payload.get('code', 'UNKNOWN')} — {payload.get('message', '')}"
     )
 
@@ -233,7 +233,7 @@ def _execute_and_log_step(
     registry: dale.DataRegistry,
     action_log: ActionLog,
     *,
-    primitive: str,
+    operation: str,
     intent: str,
     call_params: dict[str, Any],
     peek_at_every_step: bool,
@@ -241,7 +241,7 @@ def _execute_and_log_step(
     repetition_limit: int | None,
     verbosity: Verbosity,
 ) -> dict:
-    """Runs one primitive call through the real dale.call_primitive path,
+    """Runs one operation call through the real dale.call_operation path,
     splices in peek_at_every_step's auto_inspect and a repetition_nudge
     (the Tier-1 stuck-detection design) where applicable, records it
     in the action log, and prints it live at verbosity != "quiet". The single
@@ -252,7 +252,7 @@ def _execute_and_log_step(
     change just because calls arrived together.
 
     `repetition_limit` escalates repetition_nudge's warning into a stop: once
-    the same (primitive, params) pair has failed that many times, the run ends
+    the same (operation, params) pair has failed that many times, the run ends
     with AgentLoopTerminated instead of the model being warned again. Both
     read the same count from _count_prior_identical_failures — the kill needed
     no new detection mechanism, only permission to act on what the nudge was
@@ -262,7 +262,7 @@ def _execute_and_log_step(
     terminal: dale.DaleError | None = None
     started = time.perf_counter()
     try:
-        output = dale.call_primitive(registry, primitive, call_params)
+        output = dale.call_operation(registry, operation, call_params)
         payload = output.model_dump(exclude_none=True)
     except dale.ToolCallLimitError as exc:
         # The one DaleError that describes the session rather than the call:
@@ -274,16 +274,16 @@ def _execute_and_log_step(
         terminal = exc
     except dale.DaleError as exc:
         payload = exc.to_payload()
-    # Measured before the auto-inspect splice below, so a primitive's own cost
+    # Measured before the auto-inspect splice below, so an operation's own cost
     # is never inflated by DALE's optional inspection of its result.
     elapsed_ms = (time.perf_counter() - started) * 1000
 
     auto_inspect_ms = 0.0
     if peek_at_every_step and not registry.privacy_mode and payload.get("status") == "ok":
         handle_meta = payload.get("handle")
-        if isinstance(handle_meta, dict) and "handle" in handle_meta:
+        if isinstance(handle_meta, dict) and "name" in handle_meta:
             inspect_started = time.perf_counter()
-            inspected = _auto_inspect(registry, handle_meta["handle"])
+            inspected = _auto_inspect(registry, handle_meta["name"])
             auto_inspect_ms = (time.perf_counter() - inspect_started) * 1000
             if inspected is not None:
                 payload["auto_inspect"] = inspected
@@ -294,15 +294,15 @@ def _execute_and_log_step(
     # is exactly `attempt_number > THRESHOLD`, unchanged in behavior.
     attempt_number = 0
     if payload.get("status") != "ok" and (repetition_nudge or repetition_limit is not None):
-        attempt_number = _count_prior_identical_failures(action_log, primitive, call_params) + 1
+        attempt_number = _count_prior_identical_failures(action_log, operation, call_params) + 1
         if repetition_nudge and attempt_number > _REPETITION_NUDGE_THRESHOLD:
             payload["repetition_warning"] = _repetition_nudge_text(
-                primitive, payload, attempt_number
+                operation, payload, attempt_number
             )
 
     entry = action_log.record(
         intent=intent,
-        primitive=primitive,
+        operation=operation,
         params=call_params,
         result=payload,
         elapsed_ms=elapsed_ms,
@@ -325,7 +325,7 @@ def _execute_and_log_step(
         raise AgentLoopTerminated(
             f"tool call limit reached: {terminal.message}",
             code=terminal.code,
-            primitive=primitive,
+            operation=operation,
         ) from terminal
 
     # `attempt_number >= 1` is not redundant with the limit comparison: it is
@@ -340,9 +340,9 @@ def _execute_and_log_step(
     # caller having been well-behaved to avoid killing a run that is working.
     if repetition_limit is not None and attempt_number >= 1 and attempt_number >= repetition_limit:
         raise AgentLoopTerminated(
-            _repetition_stop_message(primitive, payload, attempt_number),
+            _repetition_stop_message(operation, payload, attempt_number),
             code="REPETITION_LIMIT_EXCEEDED",
-            primitive=primitive,
+            operation=operation,
             attempts=attempt_number,
         )
     return payload

@@ -14,7 +14,7 @@ still get flagged, without a separate correlation step.
 
 Sorts internally rather than requiring pre-sorted input (unlike DESIGN.md's
 illustrative pipeline description, which lists sort_by as a separate prior
-step) — consistent with every other primitive in this catalog not imposing
+step) — consistent with every other operation in this catalog not imposing
 ordering preconditions on its caller.
 """
 
@@ -26,7 +26,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dale.catalog import PrimitiveOutput, primitive
+from dale.catalog import OperationOutput, operation
 from dale.errors import TypeMismatchError
 from dale.grammar import Predicate, matches
 from dale.keys import make_key
@@ -76,8 +76,8 @@ def _window_delta(sample_value: Any, window_size: float) -> Any:
     return timedelta(seconds=window_size) if isinstance(sample_value, datetime) else window_size
 
 
-@primitive("window_flag", WindowFlagParams, bounded_by_input=True, creates_handle=True)
-def window_flag(registry: DataRegistry, params: WindowFlagParams) -> PrimitiveOutput:
+@operation("window_flag", WindowFlagParams, bounded_by_input=True, creates_handle=True)
+def window_flag(registry: DataRegistry, params: WindowFlagParams) -> OperationOutput:
     """Flag records with >= threshold qualifying occurrences (matching an
     optional predicate) within a trailing window over an orderable field,
     grouped by one or more key fields. Returns a new list handle with two
@@ -85,10 +85,10 @@ def window_flag(registry: DataRegistry, params: WindowFlagParams) -> PrimitiveOu
     is grouped, not guaranteed to match input order — sort_by afterward if a
     specific order matters."""
     meta = registry.meta(params.handle)
-    if meta.kind != "list":
+    if meta.type != "list":
         raise TypeMismatchError(
-            f"window_flag requires a list handle, got {meta.kind!r}",
-            details={"handle": params.handle, "kind": meta.kind},
+            f"window_flag requires a list handle, got {meta.type!r}",
+            details={"handle": params.handle, "type": meta.type},
         )
 
     source = registry.get(params.handle)
@@ -140,4 +140,4 @@ def window_flag(registry: DataRegistry, params: WindowFlagParams) -> PrimitiveOu
         created_by="window_flag",
         source_handles=[params.handle],
     )
-    return PrimitiveOutput(status="ok", handle=new_meta)
+    return OperationOutput(status="ok", handle=new_meta)

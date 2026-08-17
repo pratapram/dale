@@ -4,7 +4,7 @@ Every error the LLM-facing dispatch layer can raise is a DaleError with a stable
 ``code`` and a human-readable ``message`` that never embeds a raw traceback, a
 filesystem path, or (per the strict-privacy design intent) real data values.
 Anything unexpected is caught by dispatch and re-raised as InternalError with a
-generic message — see dispatch.call_primitive.
+generic message — see dispatch.call_operation.
 """
 
 from __future__ import annotations
@@ -102,8 +102,8 @@ class FieldCollisionError(DaleError):
     code = "FIELD_COLLISION"
 
 
-class PrimitiveNotFoundError(DaleError):
-    code = "PRIMITIVE_NOT_FOUND"
+class OperationNotFoundError(DaleError):
+    code = "OPERATION_NOT_FOUND"
 
 
 class GraphCycleError(DaleError):

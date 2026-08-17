@@ -304,9 +304,9 @@ def test_baseline_arm_scales_with_the_data():
     registry = fresh_registry("uc3")
     inflated = dale.DataRegistry(files=dale.FileRegistry())
     for meta in registry.list_handles():
-        rows = registry.materialize(meta.handle)
+        rows = registry.materialize(meta.name)
         inflated.create(
-            "list", rows * 20, name=meta.handle, description=meta.description, created_by="test"
+            "list", rows * 20, name=meta.name, description=meta.description, created_by="test"
         )
     task = USE_CASES["uc3"][1]
     big_baseline = _words(user_text=build_baseline_prompt(inflated, task))
@@ -321,7 +321,7 @@ def test_dales_context_does_not_scale_with_row_count():
     by a couple of digits in a size field, not by row count.
 
     (The tool-schema half is row-independent by construction — it is built from
-    the primitive catalog and never sees the data at all — so the system prompt
+    the operation catalog and never sees the data at all — so the system prompt
     is the only part that could have scaled.)"""
     from dale.agent import default_system_prompt
 
@@ -420,8 +420,8 @@ def test_uc2s_dale_checker_still_passes_a_correct_pipeline():
     from eval.use_cases import check_uc2
 
     registry = fresh_registry("uc2")
-    logs = registry.list_handles()[0].handle
-    dale.call_primitive(
+    logs = registry.list_handles()[0].name
+    dale.call_operation(
         registry,
         "window_flag",
         {

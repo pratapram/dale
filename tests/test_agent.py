@@ -29,7 +29,7 @@ class FakeCtx:
     """Stands in for pydantic_ai.RunContext — run_plan_fn reads ctx.deps, and
     ctx.messages under verbosity="raw". The latter is a class attribute rather
     than absent because run_plan_fn's raw block is now the *only* copy of that
-    code (the per-primitive tool's duplicate is gone), so it has to be
+    code (the per-operation tool's duplicate is gone), so it has to be
     reachable from here."""
 
     messages: list = []
@@ -57,7 +57,7 @@ def _run_plan(action_log=None, **kwargs):
 
 def _batch(registry, tool, params_model, *steps):
     """Submit one run_plan call carrying `steps` and return its payload. A
-    single primitive call is `_batch(..., one_step)` — the trivial case, not a
+    single operation call is `_batch(..., one_step)` — the trivial case, not a
     special one."""
     return tool.function(FakeCtx(registry), params_model(steps=list(steps)))
 
@@ -73,18 +73,18 @@ def _published(tool):
 
 
 def _step_defs(tool) -> dict:
-    """The published `<X>ParamsPlanStep` `$defs`, keyed by primitive name."""
+    """The published `<X>ParamsPlanStep` `$defs`, keyed by operation name."""
     defs = _published(tool).get("$defs", {})
     return {
-        v["properties"]["primitive"]["const"]: v
+        v["properties"]["operation"]["const"]: v
         for k, v in defs.items()
         if k.endswith("PlanStep")
     }
 
 
 def _step_mapping(tool) -> dict:
-    """The discriminator's own primitive -> `$def` mapping — the other half of
-    "is this primitive offered", and the half a model actually dispatches on."""
+    """The discriminator's own operation -> `$def` mapping — the other half of
+    "is this operation offered", and the half a model actually dispatches on."""
     return _published(tool)["properties"]["steps"]["items"]["discriminator"]["mapping"]
 
 
@@ -134,13 +134,13 @@ def test_build_tools_returns_exactly_one_tool():
     assert tools[0].description
 
 
-def test_every_primitive_is_reachable_as_a_step():
-    """The catalog didn't shrink when the tools did — every primitive is still
+def test_every_operation_is_reachable_as_a_step():
+    """The catalog didn't shrink when the tools did — every operation is still
     offered, just through one surface. Asserted on the *published* discriminator
     mapping, which is what the model dispatches on."""
     tool, _ = _run_plan()
-    assert set(_step_mapping(tool)) == set(dale.list_primitives())
-    assert set(_step_defs(tool)) == set(dale.list_primitives())
+    assert set(_step_mapping(tool)) == set(dale.list_operations())
+    assert set(_step_defs(tool)) == set(dale.list_operations())
 
 
 def test_intent_is_required_on_every_step_variant():
@@ -150,11 +150,125 @@ def test_intent_is_required_on_every_step_variant():
     must not travel with it."""
     tool, _ = _run_plan()
     variants = _step_defs(tool)
-    assert len(variants) == len(dale.list_primitives())
+    assert len(variants) == len(dale.list_operations())
     for name, schema in variants.items():
         assert "intent" in schema["properties"], name
         assert "intent" in schema["required"], name
         assert "description" not in schema["properties"]["intent"], name
+
+
+def test_the_step_discriminator_is_the_wire_field_operation():
+    """`operation` is not an internal attribute name — it is the JSON key the
+    model writes on every single step it ever sends, and the key pydantic
+    dispatches the union on. It travels in three places that have to agree:
+    the discriminator declaration, each variant's `const`, and each variant's
+    `required` list. Asserted on the *published* schema (`_published`), since
+    that is the only one that reaches the model.
+
+    A rename that updated the Python field but left any one of these three
+    saying `primitive` would fail every model call with a validation error the
+    model cannot repair, because the schema it was shown would disagree with
+    the schema it is validated against."""
+    tool, _ = _run_plan()
+    steps = _published(tool)["properties"]["steps"]
+
+    assert steps["items"]["discriminator"]["propertyName"] == "operation"
+    assert set(steps["items"]["discriminator"]["mapping"]) == set(dale.list_operations())
+
+    for name, schema in _step_defs(tool).items():
+        assert schema["properties"]["operation"]["const"] == name, name
+        assert "operation" in schema["required"], name
+        assert "primitive" not in schema["properties"], name
+
+
+def test_a_step_sent_with_the_pre_rename_primitive_field_is_rejected():
+    """A clean break has to be enforced at the wire, not just in the schema
+    text. `operation` was `primitive`, and the step models forbid extras — so
+    a caller (or a cached tool definition, or a replayed transcript) still
+    sending `primitive` must fail loudly at validation rather than have the
+    key ignored and the step silently dropped or misrouted.
+
+    The negative case is the one that matters: with `primitive` merely absent
+    from the schema, a permissive model would have accepted the step, found no
+    discriminator, and either raised somewhere far downstream or run the wrong
+    operation. The positive control below is what proves this test would still
+    notice if step validation stopped happening at all."""
+    _, params_model = _run_plan()
+
+    old_style = {
+        "primitive": "peek",
+        "handle": "widgets",
+        "intent": "inspect",
+    }
+    with pytest.raises(ValidationError) as exc_info:
+        params_model(steps=[old_style])
+    # The failure is specifically "no discriminator", not some incidental
+    # complaint about the extra key.
+    assert "operation" in str(exc_info.value)
+
+    # Positive control: the identical step with the new field name validates.
+    new_style = dict(old_style)
+    new_style["operation"] = new_style.pop("primitive")
+    assert params_model(steps=[new_style]).steps[0].operation == "peek"
+
+
+def test_a_created_handle_renders_with_its_name_as_an_assignment_prefix(registry):
+    """`in_stock_widgets = widgets.filter_where(...)` — the prefix that says
+    *when* a handle came into being, rather than leaving a reader to infer it
+    from Registry State further down.
+
+    `_render_assignment` reads the handle out of the *serialized* result dict
+    by string key, and returns the call unchanged when the key is missing. So
+    when the DataHandle's serialized `handle` key became `name`, the prefix
+    just stopped being emitted — no exception, no failing type check, and
+    every other render assertion (intent, status, Registry State) still
+    passed. Only the byte-for-byte golden fixture caught it. This is the same
+    property, stated directly, so the next reader gets a one-line diagnosis
+    instead of a 400-line JSON diff.
+
+    Also pinned: the non-creating call gets *no* prefix — that branch is what
+    makes the prefix mean something."""
+    handle = registry.create(
+        "list",
+        [{"name": "Widget", "in_stock": True}],
+        name="widgets",
+        description="d",
+        created_by="fixture",
+    )
+    log = ActionLog()
+    tool, params_model = _run_plan(log)
+
+    _batch(
+        registry,
+        tool,
+        params_model,
+        {
+            "operation": "filter_where",
+            "handle": handle.name,
+            "predicate": {"field": "in_stock", "op": "==", "value": True},
+            "intent": "keep in-stock",
+            "name": "in_stock_widgets",
+            "description": "in-stock widgets",
+        },
+        {"operation": "peek", "handle": "in_stock_widgets", "intent": "check", "n": 1},
+    )
+
+    creating, inspecting = log.entries
+    assert ActionLog._render_entry(creating).splitlines()[1] == (
+        "    Action: in_stock_widgets = widgets.filter_where(predicate='in_stock == True')"
+    )
+    # peek creates nothing, so there is nothing to assign.
+    assert ActionLog._render_entry(inspecting).splitlines()[1] == (
+        "    Action: in_stock_widgets.peek(n=1)"
+    )
+
+    rendered = log.render()
+    assert "in_stock_widgets = widgets.filter_where(" in rendered
+
+    # And the reason it works: the name the prefix prints comes from the
+    # serialized DataHandle's `name` key, which is also the real registry id.
+    assert creating.result["handle"]["name"] == "in_stock_widgets"
+    assert "handle" not in creating.result["handle"]
 
 
 def test_tool_call_records_action_log_entry(registry):
@@ -173,8 +287,8 @@ def test_tool_call_records_action_log_entry(registry):
         tool,
         params_model,
         {
-            "primitive": "filter_where",
-            "handle": handle.handle,
+            "operation": "filter_where",
+            "handle": handle.name,
             "predicate": {"field": "in_stock", "op": "==", "value": True},
             "intent": "keep in-stock items",
             "name": "in_stock_widgets",
@@ -190,16 +304,16 @@ def test_tool_call_records_action_log_entry(registry):
     entry = log.entries[0]
     assert entry.step == 1
     assert entry.intent == "keep in-stock items"
-    assert entry.primitive == "filter_where"
+    assert entry.operation == "filter_where"
     assert entry.status == "ok"
-    assert "intent" not in entry.params  # stripped before reaching dale.call_primitive
-    # ...and so is `primitive`, the discriminator field this change introduced.
+    assert "intent" not in entry.params  # stripped before reaching dale.call_operation
+    # ...and so is `operation`, the discriminator field this change introduced.
     # A leak would be loud at dispatch (every param schema forbids extras), but
     # entry.params *is* the audit record, so it is pinned here rather than left
     # to be inferred from some other test going red.
-    assert "primitive" not in entry.params
+    assert "operation" not in entry.params
     assert entry.params["name"] == "in_stock_widgets"  # forwarded, unlike intent
-    assert payload["handle"]["handle"] == "in_stock_widgets"  # name IS the real handle now
+    assert payload["handle"]["name"] == "in_stock_widgets"  # name IS the real handle now
 
 
 def test_tool_call_error_path_is_logged(registry):
@@ -210,7 +324,7 @@ def test_tool_call_error_path_is_logged(registry):
         registry,
         tool,
         params_model,
-        {"primitive": "peek", "handle": "does_not_exist", "intent": "inspect a bad handle"},
+        {"operation": "peek", "handle": "does_not_exist", "intent": "inspect a bad handle"},
     )
     assert outer["status"] == "partial"
     payload = outer["results"][0]
@@ -228,7 +342,7 @@ def test_action_log_step_numbers_increment_across_separate_batches(registry):
     )
     log = ActionLog()
     tool, params_model = _run_plan(log)
-    step = {"primitive": "peek", "handle": handle.handle, "intent": "check"}
+    step = {"operation": "peek", "handle": handle.name, "intent": "check"}
 
     for _ in range(3):
         _batch(registry, tool, params_model, step)
@@ -246,7 +360,7 @@ def test_action_log_step_numbers_increment_within_one_batch(registry):
     )
     log = ActionLog()
     tool, params_model = _run_plan(log)
-    step = {"primitive": "peek", "handle": handle.handle, "intent": "check"}
+    step = {"operation": "peek", "handle": handle.name, "intent": "check"}
 
     payload = _batch(registry, tool, params_model, step, dict(step), dict(step))
 
@@ -264,7 +378,7 @@ def test_action_log_render_includes_intent_and_status(registry):
         registry,
         tool,
         params_model,
-        {"primitive": "peek", "handle": handle.handle, "intent": "sanity check"},
+        {"operation": "peek", "handle": handle.name, "intent": "sanity check"},
     )
 
     rendered = log.render()
@@ -302,8 +416,8 @@ def test_action_log_render_shows_predicate_as_boolean_logic_not_raw_json(registr
         tool,
         params_model,
         {
-            "primitive": "filter_where",
-            "handle": handle.handle,
+            "operation": "filter_where",
+            "handle": handle.name,
             "predicate": nested_predicate,
             "intent": "filter",
             "name": "filtered_widgets",
@@ -456,9 +570,9 @@ def test_an_explicitly_sent_null_value_survives_a_run_plan_step(registry):
         tool,
         params_model,
         {
-            "primitive": "filter_where",
+            "operation": "filter_where",
             "intent": "find rows whose x is null",
-            "handle": handle.handle,
+            "handle": handle.name,
             "predicate": {"field": "x", "op": "==", "value": None},
             "name": "null_x_list",
             "description": "rows with a null x",
@@ -485,11 +599,11 @@ def test_an_explicitly_sent_null_value_reaches_dispatch_intact_mid_batch(registr
         registry,
         tool,
         params_model,
-        {"primitive": "peek", "intent": "look first", "handle": handle.handle},
+        {"operation": "peek", "intent": "look first", "handle": handle.name},
         {
-            "primitive": "filter_where",
+            "operation": "filter_where",
             "intent": "find rows whose x is null",
-            "handle": handle.handle,
+            "handle": handle.name,
             "predicate": {"field": "x", "op": "==", "value": None},
             "name": "null_x_list",
             "description": "rows with a null x",
@@ -518,8 +632,8 @@ def test_optional_params_the_model_never_sent_are_still_stripped(registry):
         registry,
         tool,
         params_model,
-        {"primitive": "describe", "handle": handle.handle, "intent": "what fields exist"},
-        {"primitive": "peek", "handle": handle.handle, "intent": "check the shape"},
+        {"operation": "describe", "handle": handle.name, "intent": "what fields exist"},
+        {"operation": "peek", "handle": handle.name, "intent": "check the shape"},
     )
 
     assert "field" not in log.entries[0].params
@@ -552,15 +666,15 @@ def test_run_plan_executes_multiple_steps_in_order(registry):
         tool,
         params_model,
         {
-            "primitive": "filter_where",
+            "operation": "filter_where",
             "intent": "keep in-stock items",
-            "handle": handle.handle,
+            "handle": handle.name,
             "predicate": {"field": "in_stock", "op": "==", "value": True},
             "name": "in_stock_list",
             "description": "in-stock products",
         },
         {
-            "primitive": "sort_by",
+            "operation": "sort_by",
             "intent": "sort by price ascending",
             "handle": "in_stock_list",
             "keys": [{"field": "price", "order": "asc"}],
@@ -576,7 +690,7 @@ def test_run_plan_executes_multiple_steps_in_order(registry):
     # batched call is indistinguishable in the trace from two calls made on
     # separate turns.
     assert len(log.entries) == 2
-    assert [e.primitive for e in log.entries] == ["filter_where", "sort_by"]
+    assert [e.operation for e in log.entries] == ["filter_where", "sort_by"]
     assert [e.intent for e in log.entries] == [
         "keep in-stock items",
         "sort by price ascending",
@@ -598,22 +712,22 @@ def test_run_plan_stops_at_first_failure_and_returns_partial_results(registry):
         tool,
         params_model,
         {
-            "primitive": "filter_where",
+            "operation": "filter_where",
             "intent": "keep in-stock items",
-            "handle": handle.handle,
+            "handle": handle.name,
             "predicate": {"field": "in_stock", "op": "==", "value": True},
             "name": "in_stock_list",
             "description": "d",
         },
         {
-            "primitive": "sort_by",
+            "operation": "sort_by",
             "intent": "sort a handle that doesn't exist",
             "handle": "does_not_exist",
             "keys": [{"field": "x", "order": "asc"}],
             "name": "unreachable",
             "description": "d",
         },
-        {"primitive": "release_handle", "intent": "never reached", "handle": "in_stock_list"},
+        {"operation": "release_handle", "intent": "never reached", "handle": "in_stock_list"},
     )
 
     assert payload["status"] == "partial"
@@ -635,7 +749,7 @@ def test_run_plan_step_requires_intent(registry):
         params_model(
             steps=[
                 {
-                    "primitive": "peek",
+                    "operation": "peek",
                     # intent omitted
                     "handle": "x",
                 }
@@ -643,18 +757,18 @@ def test_run_plan_step_requires_intent(registry):
         )
 
 
-def test_run_plan_rejects_unknown_primitive_name(registry):
+def test_run_plan_rejects_unknown_operation_name(registry):
     _, params_model = _run_plan()
     with pytest.raises(ValidationError):
         params_model(
-            steps=[{"primitive": "not_a_real_primitive", "intent": "x", "handle": "x"}]
+            steps=[{"operation": "not_a_real_operation", "intent": "x", "handle": "x"}]
         )
 
 
 def test_run_plan_excludes_peek_step_under_privacy_mode(registry):
     _, params_model = _run_plan(privacy_mode=True)
     with pytest.raises(ValidationError):
-        params_model(steps=[{"primitive": "peek", "intent": "x", "handle": "x"}])
+        params_model(steps=[{"operation": "peek", "intent": "x", "handle": "x"}])
 
 
 def test_run_plan_splices_auto_inspect_per_step(registry):
@@ -669,9 +783,9 @@ def test_run_plan_splices_auto_inspect_per_step(registry):
         tool,
         params_model,
         {
-            "primitive": "filter_where",
+            "operation": "filter_where",
             "intent": "keep everything",
-            "handle": handle.handle,
+            "handle": handle.name,
             "predicate": {"field": "name", "op": "is_not_null"},
             "name": "all_widgets_list",
             "description": "d",
@@ -701,16 +815,16 @@ def test_each_handle_creating_step_of_a_batch_gets_its_own_auto_inspect(registry
         tool,
         params_model,
         {
-            "primitive": "filter_where",
+            "operation": "filter_where",
             "intent": "keep the kept ones",
             "handle": "products_list",
             "predicate": {"field": "keep", "op": "==", "value": True},
             "name": "kept_list",
             "description": "d",
         },
-        {"primitive": "peek", "intent": "look", "handle": "products_list"},
+        {"operation": "peek", "intent": "look", "handle": "products_list"},
         {
-            "primitive": "filter_where",
+            "operation": "filter_where",
             "intent": "and the dropped ones",
             "handle": "products_list",
             "predicate": {"field": "keep", "op": "==", "value": False},
@@ -757,7 +871,7 @@ def test_repetition_nudge_absent_when_params_vary(registry):
             registry,
             tool,
             params_model,
-            {"primitive": "peek", "handle": handle_name, "intent": "check"},
+            {"operation": "peek", "handle": handle_name, "intent": "check"},
         )
         assert "repetition_warning" not in payload["results"][0]
 
@@ -774,7 +888,7 @@ def test_repetition_nudge_absent_for_successful_calls(registry):
             registry,
             tool,
             params_model,
-            {"primitive": "peek", "handle": "widgets", "intent": "check"},
+            {"operation": "peek", "handle": "widgets", "intent": "check"},
         )["results"][0]
         assert payload["status"] == "ok"
         assert "repetition_warning" not in payload
@@ -804,19 +918,19 @@ def test_repetition_nudge_counts_across_separate_batches_and_within_one(registry
     )
     log = ActionLog()
     tool, params_model = _run_plan(log)
-    bad = {"primitive": "peek", "intent": "check", "handle": "does_not_exist"}
+    bad = {"operation": "peek", "intent": "check", "handle": "does_not_exist"}
 
     _batch(registry, tool, params_model, dict(bad))
     _batch(registry, tool, params_model, dict(bad))
 
     # ...then the identical call arrives as the second step of a batch -- still
-    # the third occurrence of the same (primitive, params) pair, so it nudges.
+    # the third occurrence of the same (operation, params) pair, so it nudges.
     # Step 1 has to succeed, or the batch stops before reaching step 2.
     payload = _batch(
         registry,
         tool,
         params_model,
-        {"primitive": "peek", "intent": "look", "handle": "widgets"},
+        {"operation": "peek", "intent": "look", "handle": "widgets"},
         dict(bad),
     )
     assert payload["results"][0]["status"] == "ok"
@@ -836,7 +950,7 @@ def _failing_peek(registry, tool, params_model):
             registry,
             tool,
             params_model,
-            {"primitive": "peek", "handle": "does_not_exist", "intent": "check"},
+            {"operation": "peek", "handle": "does_not_exist", "intent": "check"},
         )["results"][0]
 
     return call
@@ -856,7 +970,7 @@ def test_repetition_limit_terminates_on_the_nth_identical_failure(registry):
 
     exc = excinfo.value
     assert exc.code == "REPETITION_LIMIT_EXCEEDED"
-    assert exc.primitive == "peek"
+    assert exc.operation == "peek"
     assert exc.attempts == 5
     assert "HANDLE_NOT_FOUND" in str(exc)
 
@@ -880,7 +994,7 @@ def test_repetition_limit_records_the_killing_call_before_raising(registry):
 
     assert len(log.entries) == 4
     fatal = log.entries[-1]
-    assert fatal.primitive == "peek"
+    assert fatal.operation == "peek"
     assert fatal.status == "error"
     # ...carrying the nudge it was warned with, not a bare error.
     assert "repetition_warning" in fatal.result
@@ -907,7 +1021,7 @@ def test_repetition_limit_not_triggered_by_varying_params(registry):
             registry,
             tool,
             params_model,
-            {"primitive": "peek", "handle": f"missing_{i}", "intent": "check"},
+            {"operation": "peek", "handle": f"missing_{i}", "intent": "check"},
         )["results"][0]
         assert payload["status"] == "error"
 
@@ -964,7 +1078,7 @@ def test_run_plan_terminating_mid_batch_keeps_the_steps_that_already_ran(registr
             tool,
             params_model,
             {
-                "primitive": "filter_where",
+                "operation": "filter_where",
                 "intent": "keep in-stock items",
                 "handle": "products",
                 "predicate": {"field": "in_stock", "op": "==", "value": True},
@@ -972,21 +1086,21 @@ def test_run_plan_terminating_mid_batch_keeps_the_steps_that_already_ran(registr
                 "description": "d",
             },
             {
-                "primitive": "sort_by",
+                "operation": "sort_by",
                 "intent": "sort by price",
                 "handle": "in_stock_list",
                 "keys": [{"field": "price", "order": "asc"}],
                 "name": "sorted_list",
                 "description": "d",
             },
-            {"primitive": "peek", "intent": "check", "handle": "does_not_exist"},
+            {"operation": "peek", "intent": "check", "handle": "does_not_exist"},
         )
 
     assert excinfo.value.attempts == 4
     # Steps 1-2 are in the log as their own entries, and the killing step is
     # the last one — nothing was rolled back or swallowed with the discarded
     # return value.
-    assert [e.primitive for e in log.entries] == [
+    assert [e.operation for e in log.entries] == [
         "peek", "peek", "peek", "filter_where", "sort_by", "peek",
     ]
     assert [e.status for e in log.entries[3:5]] == ["ok", "ok"]
@@ -1017,7 +1131,7 @@ def test_repetition_limit_propagates_out_of_a_real_agent_run(registry):
                     {
                         "steps": [
                             {
-                                "primitive": "peek",
+                                "operation": "peek",
                                 "handle": "does_not_exist",
                                 "intent": "check",
                                 "n": 5,
@@ -1062,7 +1176,7 @@ def test_a_successful_call_never_terminates_however_low_the_limit(registry, limi
     payload = _execute_and_log_step(
         registry,
         log,
-        primitive="peek",
+        operation="peek",
         intent="check",
         call_params={"handle": "widgets"},
         peek_at_every_step=False,
@@ -1112,7 +1226,7 @@ def _registry_with_a_gated_join() -> dale.DataRegistry:
         description="d",
         created_by="fixture",
     )
-    dale.call_primitive(
+    dale.call_operation(
         reg,
         "group_by",
         {"handle": "events", "key_fields": ["k"], "name": "grouped", "description": "d"},
@@ -1121,7 +1235,7 @@ def _registry_with_a_gated_join() -> dale.DataRegistry:
 
 
 _GATED_JOIN_STEP = {
-    "primitive": "join_lookup",
+    "operation": "join_lookup",
     "intent": "attach each account's events",
     "base_handle": "base",
     "index_handle": "grouped",
@@ -1187,7 +1301,7 @@ def test_tool_call_limit_terminates_the_run():
             registry,
             tool,
             params_model,
-            {"primitive": "peek", "handle": "widgets", "intent": "check"},
+            {"operation": "peek", "handle": "widgets", "intent": "check"},
         )["results"][0]
 
     assert call()["status"] == "ok"
@@ -1199,7 +1313,7 @@ def test_tool_call_limit_terminates_the_run():
     assert excinfo.value.code == "TOOL_CALL_LIMIT_EXCEEDED"
     assert excinfo.value.attempts is None  # no single call was repeated
     # The rejected call is still in the log — it's what explains why the run
-    # stopped, and record_call() fires before the primitive runs, so the entry
+    # stopped, and record_call() fires before the operation runs, so the entry
     # correctly records a call that never executed.
     assert len(log.entries) == 3
     assert log.entries[-1].status == "error"
@@ -1249,7 +1363,7 @@ def test_tool_call_limit_catches_a_loop_repetition_limit_cannot():
                     {
                         "steps": [
                             {
-                                "primitive": "peek",
+                                "operation": "peek",
                                 "handle": f"missing_{calls['n']}",
                                 "intent": "check",
                                 "n": 5,
@@ -1287,7 +1401,7 @@ def test_peek_is_absent_from_the_step_union_under_privacy_mode():
     assert "peek" not in _step_defs(tool)
     assert "PeekParamsPlanStep" not in _published(tool)["$defs"]
     # Nothing else was dropped along with it.
-    assert set(_step_mapping(tool)) == set(dale.list_primitives()) - {"peek"}
+    assert set(_step_mapping(tool)) == set(dale.list_operations()) - {"peek"}
     # describe stays: its aggregate statistics were never "individual real
     # values" under this design's own definition.
     assert "describe" in _step_mapping(tool)
@@ -1315,8 +1429,8 @@ def test_auto_inspect_added_after_handle_creating_call(registry):
         tool,
         params_model,
         {
-            "primitive": "filter_where",
-            "handle": handle.handle,
+            "operation": "filter_where",
+            "handle": handle.name,
             "predicate": {"field": "in_stock", "op": "==", "value": True},
             "intent": "keep in-stock items",
             "name": "in_stock_widgets",
@@ -1356,7 +1470,7 @@ def test_auto_inspect_of_a_nested_handle_stays_bounded(registry):
         tool,
         params_model,
         {
-            "primitive": "index_by",
+            "operation": "index_by",
             "handle": "docs_list",
             "key_fields": ["id"],
             "intent": "index the documents by id",
@@ -1385,8 +1499,8 @@ def test_auto_inspect_absent_when_peek_at_every_step_disabled(registry):
         tool,
         params_model,
         {
-            "primitive": "filter_where",
-            "handle": handle.handle,
+            "operation": "filter_where",
+            "handle": handle.name,
             "predicate": {"field": "name", "op": "==", "value": "Widget"},
             "intent": "keep",
             "name": "filtered",
@@ -1410,8 +1524,8 @@ def test_auto_inspect_absent_under_privacy_mode_even_if_requested():
         tool,
         params_model,
         {
-            "primitive": "filter_where",
-            "handle": handle.handle,
+            "operation": "filter_where",
+            "handle": handle.name,
             "predicate": {"field": "name", "op": "==", "value": "Widget"},
             "intent": "keep",
             "name": "filtered",
@@ -1464,7 +1578,7 @@ def test_build_agent_custom_system_prompt_used_verbatim():
 
 _THREE_STEP_BATCH = [
     {
-        "primitive": "filter_where",
+        "operation": "filter_where",
         "intent": "keep in-stock items",
         "handle": "widgets",
         "predicate": {"field": "in_stock", "op": "==", "value": True},
@@ -1472,14 +1586,14 @@ _THREE_STEP_BATCH = [
         "description": "d",
     },
     {
-        "primitive": "sort_by",
+        "operation": "sort_by",
         "intent": "sort by price",
         "handle": "in_stock_list",
         "keys": [{"field": "price", "order": "asc"}],
         "name": "sorted_list",
         "description": "d",
     },
-    {"primitive": "peek", "intent": "check the result", "handle": "sorted_list"},
+    {"operation": "peek", "intent": "check the result", "handle": "sorted_list"},
 ]
 
 
@@ -1499,7 +1613,7 @@ def test_build_agent_runs_a_full_loop_over_one_batch(registry):
     tool there is nothing for TestModel to walk, and it can't synthesize a
     valid step anyway. The invariant that matters is unchanged — every step
     the model submits becomes one correctly-attributed ActionLog entry,
-    dispatched for real through dale.call_primitive, not a mocked path."""
+    dispatched for real through dale.call_operation, not a mocked path."""
     _widget_registry(registry)
     log = ActionLog()
     agent = build_agent(
@@ -1509,7 +1623,7 @@ def test_build_agent_runs_a_full_loop_over_one_batch(registry):
     result = agent.run_sync("do something", deps=registry)
 
     assert result.output
-    assert [e.primitive for e in log.entries] == ["filter_where", "sort_by", "peek"]
+    assert [e.operation for e in log.entries] == ["filter_where", "sort_by", "peek"]
     assert [e.step for e in log.entries] == [1, 2, 3]
     assert all(e.status == "ok" for e in log.entries)
     # Both handle-creating steps produced real handles in the real registry.
@@ -1548,7 +1662,7 @@ def test_render_raw_messages_labels_each_part_kind():
 
 def test_run_agent_prints_raw_tail_after_run(registry, capsys):
     """`run_plan_fn`'s raw block is now the only copy of the live raw-printing
-    code — the per-primitive tool's duplicate is gone — so this is the only
+    code — the per-operation tool's duplicate is gone — so this is the only
     guard standing between that seam and silence. It asserts both halves: the
     live per-call print of the model's own tool-call args, and run_agent's
     post-run flush of the trailing messages nothing else would ever show."""
@@ -1671,7 +1785,7 @@ class _LoggingAgent:
     def run_sync(self, task, deps, usage=None):
         self._log.record(
             intent="i",
-            primitive="filter_where",
+            operation="filter_where",
             params={},
             result={"status": "ok"},
             elapsed_ms=self._elapsed_ms,
@@ -1683,7 +1797,7 @@ class _LoggingAgent:
 def test_run_agent_attributes_auto_inspect_inside_the_host_compute_figure(registry, capsys):
     """peek_at_every_step's cost is inside the host-compute number (it is host
     compute) but named separately on a continuation line, so a convenience
-    feature can't hide inside the primitives it wraps."""
+    feature can't hide inside the operations it wraps."""
     log = ActionLog()
     agent = _LoggingAgent(log, elapsed_ms=3.0, auto_inspect_ms=2.5)
 
@@ -1704,7 +1818,7 @@ def test_run_agent_timing_covers_only_its_own_run_of_a_reused_log(registry, caps
     log = ActionLog()
     log.record(
         intent="an earlier run's work",
-        primitive="group_by",
+        operation="group_by",
         params={},
         result={"status": "ok"},
         elapsed_ms=9_000.0,
@@ -1738,7 +1852,7 @@ def _always_peek_model() -> FunctionModel:
             parts=[
                 ToolCallPart(
                     "run_plan",
-                    {"steps": [{"primitive": "peek", "handle": "widgets", "intent": "look"}]},
+                    {"steps": [{"operation": "peek", "handle": "widgets", "intent": "look"}]},
                 )
             ]
         )
@@ -1775,19 +1889,19 @@ def test_build_agent_under_privacy_mode_never_calls_peek():
     public_agent = build_agent(public, public_log, model=_always_peek_model())
     run_agent(public_agent, "do something", deps=public, action_log=public_log)
 
-    assert [e.primitive for e in public_log.entries][:1] == ["peek"]
+    assert [e.operation for e in public_log.entries][:1] == ["peek"]
     assert public_log.entries[0].status == "ok"
 
 
 # --- schema hygiene: what actually goes on the wire ------------------------
 
 
-def test_every_plan_step_variant_carries_its_primitives_docstring():
-    """The one thing that must not be skipped. While each primitive also had
+def test_every_plan_step_variant_carries_its_operations_docstring():
+    """The one thing that must not be skipped. While each operation also had
     its own named tool, that tool carried the docstring and these variants all
     shipped `description: None` — a 7,474-token *information deficit* the
     moment the named tools go away, since the model would then be selecting
-    among 17 primitives on name and parameter shape alone.
+    among 17 operations on name and parameter shape alone.
 
     Full docstrings, not first lines: that is exact information parity with
     what the named tools published, and is what the 9,502-token figure was
@@ -1804,12 +1918,12 @@ def test_every_plan_step_variant_carries_its_primitives_docstring():
     variants = _step_defs(tool)
 
     # Exactly the catalog -- a silently dropped variant fails here too.
-    assert set(variants) == set(dale.list_primitives())
+    assert set(variants) == set(dale.list_operations())
     for name, schema in variants.items():
-        doc = dale.get_primitive(name).fn.__doc__ or ""
+        doc = dale.get_operation(name).fn.__doc__ or ""
         assert doc.strip(), f"{name} has no docstring to publish"
         assert schema["description"] == inspect.cleandoc(doc), name
-        # Not truncated to a first line: every primitive whose docstring has
+        # Not truncated to a first line: every operation whose docstring has
         # more than one line must publish more than one line.
         if len(doc.strip().splitlines()) > 1:
             assert "\n" in schema["description"], name
@@ -1899,7 +2013,7 @@ def _malformed_then_good_model(*, bad_batches: int) -> tuple[FunctionModel, dict
                 parts=[
                     ToolCallPart(
                         "run_plan",
-                        {"steps": [{"primitive": "sort_by", "intent": "malformed", "handle": "widgets"}]},
+                        {"steps": [{"operation": "sort_by", "intent": "malformed", "handle": "widgets"}]},
                     )
                 ]
             )
@@ -1908,7 +2022,7 @@ def _malformed_then_good_model(*, bad_batches: int) -> tuple[FunctionModel, dict
                 parts=[
                     ToolCallPart(
                         "run_plan",
-                        {"steps": [{"primitive": "peek", "intent": "recovered", "handle": "widgets"}]},
+                        {"steps": [{"operation": "peek", "intent": "recovered", "handle": "widgets"}]},
                     )
                 ]
             )
@@ -1938,7 +2052,7 @@ def test_a_malformed_batch_is_retried_rather_than_ending_the_run(registry):
 
     assert outcome.success, outcome.error
     # Nothing from the malformed batches reached dispatch; only the good one did.
-    assert [e.primitive for e in log.entries] == ["peek"]
+    assert [e.operation for e in log.entries] == ["peek"]
     assert log.entries[0].intent == "recovered"
 
 
@@ -1974,7 +2088,7 @@ def test_raw_verbosity_prints_the_models_own_tool_call_args_before_stripping(
 
     This is also why FakeCtx now defines `messages`: nothing drove
     `run_plan_fn` at verbosity="raw" through it before, because the duplicate
-    copy in the per-primitive tool made this seam feel covered."""
+    copy in the per-operation tool made this seam feel covered."""
     from pydantic_ai.messages import ModelRequest, UserPromptPart
 
     registry.create(
@@ -1987,7 +2101,7 @@ def test_raw_verbosity_prints_the_models_own_tool_call_args_before_stripping(
     ctx.messages = [ModelRequest(parts=[UserPromptPart(content="do the thing")])]
     tool.function(
         ctx,
-        params_model(steps=[{"primitive": "peek", "handle": "widgets", "intent": "check"}]),
+        params_model(steps=[{"operation": "peek", "handle": "widgets", "intent": "check"}]),
     )
 
     captured = capsys.readouterr().out
@@ -2022,15 +2136,15 @@ def test_a_failing_middle_step_banks_earlier_work_and_skips_later_steps(registry
         tool,
         params_model,
         {
-            "primitive": "filter_where",
+            "operation": "filter_where",
             "intent": "keep in-stock",
             "handle": "products_list",
             "predicate": {"field": "in_stock", "op": "==", "value": True},
             "name": "in_stock_list",
             "description": "d",
         },
-        {"primitive": "peek", "intent": "look at nothing", "handle": "does_not_exist"},
-        {"primitive": "release_handle", "intent": "never reached", "handle": "in_stock_list"},
+        {"operation": "peek", "intent": "look at nothing", "handle": "does_not_exist"},
+        {"operation": "release_handle", "intent": "never reached", "handle": "in_stock_list"},
     )
 
     assert payload["status"] == "partial"
@@ -2038,7 +2152,7 @@ def test_a_failing_middle_step_banks_earlier_work_and_skips_later_steps(registry
     assert payload["steps_requested"] == 3
     # Step 1's real result is returned, not just its side effect.
     assert payload["results"][0]["status"] == "ok"
-    assert payload["results"][0]["handle"]["handle"] == "in_stock_list"
+    assert payload["results"][0]["handle"]["name"] == "in_stock_list"
     assert payload["results"][1]["code"] == "HANDLE_NOT_FOUND"
     assert len(log.entries) == 2
     # ...and the work it did is real and still there.
@@ -2059,9 +2173,9 @@ def test_a_cost_gated_step_halts_the_batch_like_an_error_does():
         registry,
         tool,
         params_model,
-        {"primitive": "peek", "intent": "look first", "handle": "base"},
+        {"operation": "peek", "intent": "look first", "handle": "base"},
         dict(_GATED_JOIN_STEP),
-        {"primitive": "peek", "intent": "never reached", "handle": "base"},
+        {"operation": "peek", "intent": "never reached", "handle": "base"},
     )
 
     assert payload["status"] == "partial"
@@ -2070,7 +2184,7 @@ def test_a_cost_gated_step_halts_the_batch_like_an_error_does():
     assert payload["results"][0]["status"] == "ok"
     assert payload["results"][1]["status"] == "cost_gate_exceeded"
     assert "estimate" in payload["results"][1]
-    assert [e.primitive for e in log.entries] == ["peek", "join_lookup"]
+    assert [e.operation for e in log.entries] == ["peek", "join_lookup"]
 
 
 def test_a_malformed_step_fails_the_whole_batch_before_anything_runs(registry):
@@ -2089,14 +2203,14 @@ def test_a_malformed_step_fails_the_whole_batch_before_anything_runs(registry):
             registry,
             tool,
             params_model,
-            {"primitive": "peek", "intent": "fine", "handle": "widgets"},
-            {"primitive": "describe", "intent": "also fine", "handle": "widgets"},
+            {"operation": "peek", "intent": "fine", "handle": "widgets"},
+            {"operation": "describe", "intent": "also fine", "handle": "widgets"},
             # sort_by needs `keys`, `name` and `description`.
-            {"primitive": "sort_by", "intent": "malformed", "handle": "widgets"},
+            {"operation": "sort_by", "intent": "malformed", "handle": "widgets"},
         )
 
     assert log.entries == []
-    assert {m.handle for m in registry.list_handles()} == {"widgets"}
+    assert {m.name for m in registry.list_handles()} == {"widgets"}
 
 
 def test_max_tool_calls_terminates_mid_batch():
@@ -2115,9 +2229,9 @@ def test_max_tool_calls_terminates_mid_batch():
             registry,
             tool,
             params_model,
-            {"primitive": "peek", "intent": "one", "handle": "widgets"},
-            {"primitive": "peek", "intent": "two", "handle": "widgets"},
-            {"primitive": "peek", "intent": "three", "handle": "widgets"},
+            {"operation": "peek", "intent": "one", "handle": "widgets"},
+            {"operation": "peek", "intent": "two", "handle": "widgets"},
+            {"operation": "peek", "intent": "three", "handle": "widgets"},
         )
 
     assert excinfo.value.code == "TOOL_CALL_LIMIT_EXCEEDED"
@@ -2144,14 +2258,14 @@ def test_max_steps_per_call_is_published_in_the_schema():
 def test_max_steps_per_call_of_one_reproduces_the_unbatched_condition(registry):
     """paper.md Section 4.2 part (F)'s ablation arm. `enable_run_plan=False`
     used to express it by withholding a second tool; with one tool it is a
-    ceiling on batch size instead, which is the same experiment — one primitive
+    ceiling on batch size instead, which is the same experiment — one operation
     per round trip — and names what it actually does."""
     registry.create(
         "list", [{"name": "Widget"}], name="widgets", description="d", created_by="fixture"
     )
     log = ActionLog()
     tool, params_model = _run_plan(log, max_steps_per_call=1)
-    step = {"primitive": "peek", "intent": "check", "handle": "widgets"}
+    step = {"operation": "peek", "intent": "check", "handle": "widgets"}
 
     assert _batch(registry, tool, params_model, dict(step))["status"] == "ok"
     with pytest.raises(ValidationError):
@@ -2169,23 +2283,23 @@ def test_a_max_steps_per_call_below_one_is_rejected(registry, bad):
         build_agent(registry, ActionLog(), model="test", max_steps_per_call=bad)
 
 
-# --- primitives= allowlist --------------------------------------------------
+# --- operations= allowlist --------------------------------------------------
 
 
-def test_an_unknown_primitive_name_is_rejected_at_build_time(registry):
-    """A typo must not silently shrink the catalog: dropped primitives surface
+def test_an_unknown_operation_name_is_rejected_at_build_time(registry):
+    """A typo must not silently shrink the catalog: dropped operations surface
     much later as an inexplicable model failure, with nothing pointing back
     here."""
     with pytest.raises(ValueError, match="flter_where"):
-        build_tools(ActionLog(), primitives=["filter_where", "flter_where"])
+        build_tools(ActionLog(), operations=["filter_where", "flter_where"])
     with pytest.raises(ValueError, match="flter_where"):
         build_agent(
-            registry, ActionLog(), model="test", primitives=["filter_where", "flter_where"]
+            registry, ActionLog(), model="test", operations=["filter_where", "flter_where"]
         )
 
 
 def test_the_allowlist_restricts_what_the_model_is_offered(registry):
-    tool, params_model = _run_plan(primitives=["peek", "describe"])
+    tool, params_model = _run_plan(operations=["peek", "describe"])
 
     assert set(_step_mapping(tool)) == {"peek", "describe"}
     assert set(_step_defs(tool)) == {"peek", "describe"}
@@ -2193,7 +2307,7 @@ def test_the_allowlist_restricts_what_the_model_is_offered(registry):
         params_model(
             steps=[
                 {
-                    "primitive": "filter_where",
+                    "operation": "filter_where",
                     "intent": "x",
                     "handle": "h",
                     "predicate": {"field": "a", "op": "is_null"},
@@ -2204,9 +2318,9 @@ def test_the_allowlist_restricts_what_the_model_is_offered(registry):
         )
 
 
-def test_the_allowlist_does_not_restrict_call_primitive(registry):
+def test_the_allowlist_does_not_restrict_call_operation(registry):
     """"This governs what the *model* is offered, not what the host may run."
-    An eval harness loading its own fixtures through dale.call_primitive is not
+    An eval harness loading its own fixtures through dale.call_operation is not
     the party being constrained."""
     registry.create(
         "list",
@@ -2215,9 +2329,9 @@ def test_the_allowlist_does_not_restrict_call_primitive(registry):
         description="d",
         created_by="fixture",
     )
-    build_tools(ActionLog(), primitives=["peek", "describe"])
+    build_tools(ActionLog(), operations=["peek", "describe"])
 
-    out = dale.call_primitive(
+    out = dale.call_operation(
         registry,
         "filter_where",
         {
@@ -2231,32 +2345,32 @@ def test_the_allowlist_does_not_restrict_call_primitive(registry):
     assert registry.materialize("kept_list") == [{"name": "Widget", "keep": True}]
 
 
-def test_primitives_none_is_todays_behaviour():
+def test_operations_none_is_todays_behaviour():
     """The backward-compatible default, pinned."""
-    tool, _ = _run_plan(primitives=None)
-    assert set(_step_mapping(tool)) == set(dale.list_primitives())
+    tool, _ = _run_plan(operations=None)
+    assert set(_step_mapping(tool)) == set(dale.list_operations())
 
 
 def test_the_allowlist_and_privacy_mode_compose():
     """Two filters on the same dimension is exactly where an and/or mistake
     hides. Both must apply: peek is allowed by the caller and forbidden by
     privacy_mode, and privacy_mode wins."""
-    tool, _ = _run_plan(primitives=["peek", "describe"], privacy_mode=True)
+    tool, _ = _run_plan(operations=["peek", "describe"], privacy_mode=True)
     assert set(_step_mapping(tool)) == {"describe"}
 
 
 def test_an_allowlist_that_selects_nothing_is_rejected_with_a_legible_error(registry):
     """Left to fall through, an empty selection surfaces as "TypeError: Cannot
     take a Union of no types" from inside `typing` — a message that names
-    neither primitives nor privacy_mode. Both routes here are plausible
+    neither operations nor privacy_mode. Both routes here are plausible
     configuration mistakes, and the second is the nastier one: two individually
     reasonable filters that jointly leave nothing."""
-    with pytest.raises(ValueError, match="selects no primitives"):
-        build_tools(ActionLog(), primitives=[])
+    with pytest.raises(ValueError, match="selects no operations"):
+        build_tools(ActionLog(), operations=[])
     with pytest.raises(ValueError, match="privacy_mode"):
-        build_tools(ActionLog(), primitives=["peek"], privacy_mode=True)
-    with pytest.raises(ValueError, match="selects no primitives"):
-        build_agent(registry, ActionLog(), model="test", primitives=[])
+        build_tools(ActionLog(), operations=["peek"], privacy_mode=True)
+    with pytest.raises(ValueError, match="selects no operations"):
+        build_agent(registry, ActionLog(), model="test", operations=[])
 
 
 def _schema_a_real_request_carries(registry, **kwargs) -> dict:
@@ -2302,7 +2416,7 @@ def test_build_agent_hands_the_allowlist_and_step_ceiling_to_the_wire(registry):
     the model. That is the failure this pins: silent, invisible offline, and
     only ever observed as a bill."""
     published = _schema_a_real_request_carries(
-        registry, primitives=["peek", "describe"], max_steps_per_call=2
+        registry, operations=["peek", "describe"], max_steps_per_call=2
     )
     steps = published["properties"]["steps"]
 
@@ -2316,10 +2430,10 @@ def test_build_agent_hands_the_allowlist_and_step_ceiling_to_the_wire(registry):
 def test_the_allowlist_ignores_caller_ordering_and_duplicates():
     """Read as a set against the catalog's own order, so a caller's ordering
     can't reorder the published union (and a duplicate can't double a
-    variant) — the schema a request carries should depend on which primitives
+    variant) — the schema a request carries should depend on which operations
     were asked for, not on how they were typed."""
-    a, _ = _run_plan(primitives=["sort_by", "peek", "peek"])
-    b, _ = _run_plan(primitives=["peek", "sort_by"])
+    a, _ = _run_plan(operations=["sort_by", "peek", "peek"])
+    b, _ = _run_plan(operations=["peek", "sort_by"])
     assert _published(a) == _published(b)
 
 
@@ -2378,7 +2492,7 @@ def _baseline_module():
     same ones that produced the frozen files — a test that re-derives "scrub the
     timings" can drift from the capture and then compares two different
     normalizations of two different things. Only the normalizers and the fixture
-    data are used; the script's own pipelines call the named per-primitive tools
+    data are used; the script's own pipelines call the named per-operation tools
     and no longer run, which is the whole point."""
     import importlib.util
     from pathlib import Path
@@ -2413,7 +2527,7 @@ def _read_baseline(name):
 
 
 _FILTER_STEP = {
-    "primitive": "filter_where",
+    "operation": "filter_where",
     "handle": "products_list",
     "predicate": {"field": "in_stock", "op": "==", "value": True},
     "intent": "keep in-stock",
@@ -2461,7 +2575,7 @@ def test_a_multi_step_batch_produces_the_pre_change_trace():
         params_model,
         dict(_FILTER_STEP),
         {
-            "primitive": "compute_field",
+            "operation": "compute_field",
             "handle": "in_stock_list",
             "as": "value",
             "op": "multiply",
@@ -2472,14 +2586,14 @@ def test_a_multi_step_batch_produces_the_pre_change_trace():
             "description": "with value",
         },
         {
-            "primitive": "sort_by",
+            "operation": "sort_by",
             "handle": "valued_list",
             "keys": [{"field": "value", "order": "desc"}],
             "intent": "rank by value",
             "name": "ranked_list",
             "description": "ranked",
         },
-        {"primitive": "peek", "handle": "ranked_list", "intent": "check", "n": 2},
+        {"operation": "peek", "handle": "ranked_list", "intent": "check", "n": 2},
     )
 
     expected_entries, expected_render = _read_baseline("four_step")

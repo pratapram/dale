@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from dale.catalog import ConfirmableParams, PrimitiveOutput, primitive
+from dale.catalog import ConfirmableParams, OperationOutput, operation
 from dale.cost import CostEstimate, make_estimate
 from dale.errors import FieldNotFoundError, GraphCycleError, TypeMismatchError
 from dale.grammar import Priority, resolve_priority
@@ -38,20 +38,20 @@ class GraphWalkResolveParams(ConfirmableParams):
 
 
 def _validate_graph_walk_handles(registry: DataRegistry, params: GraphWalkResolveParams) -> None:
-    """Shared by the cost estimator and the primitive itself — the estimator
+    """Shared by the cost estimator and the operation itself — the estimator
     runs first (dispatch.py), so validation cannot live only in the latter."""
     nodes_meta = registry.meta(params.nodes_index_handle)
     rules_meta = registry.meta(params.rules_handle)
-    if nodes_meta.kind != "dict":
+    if nodes_meta.type != "dict":
         raise TypeMismatchError(
             f"graph_walk_resolve nodes_index_handle must be a dict (built via index_by), "
-            f"got {nodes_meta.kind!r}",
-            details={"handle": params.nodes_index_handle, "kind": nodes_meta.kind},
+            f"got {nodes_meta.type!r}",
+            details={"handle": params.nodes_index_handle, "type": nodes_meta.type},
         )
-    if rules_meta.kind != "list":
+    if rules_meta.type != "list":
         raise TypeMismatchError(
-            f"graph_walk_resolve rules_handle must be a list, got {rules_meta.kind!r}",
-            details={"handle": params.rules_handle, "kind": rules_meta.kind},
+            f"graph_walk_resolve rules_handle must be a list, got {rules_meta.type!r}",
+            details={"handle": params.rules_handle, "type": rules_meta.type},
         )
 
 
@@ -107,7 +107,7 @@ def _estimate_output_rows(registry: DataRegistry, params: GraphWalkResolveParams
     # Deliberate over-estimate (like join_lookup's byte estimate): the true
     # count depends on which ancestor chains actually reach a rule for each
     # group, which is the graph walk itself — computing it exactly here would
-    # mean doing the primitive's own work twice.
+    # mean doing the operation's own work twice.
     return nodes_meta.size * max(len(distinct_groups), 1)
 
 
@@ -119,13 +119,13 @@ def graph_walk_resolve_cost_estimator(
     return make_estimate(estimated_rows, nodes_meta.avg_record_bytes, registry.limits.max_result_rows)
 
 
-@primitive(
+@operation(
     "graph_walk_resolve",
     GraphWalkResolveParams,
     cost_estimator=graph_walk_resolve_cost_estimator,
     creates_handle=True,
 )
-def graph_walk_resolve(registry: DataRegistry, params: GraphWalkResolveParams) -> PrimitiveOutput:
+def graph_walk_resolve(registry: DataRegistry, params: GraphWalkResolveParams) -> OperationOutput:
     """For every node in an index_by-built dict, walk its single-parent chain
     (self, then parent, then parent's parent, ...) collecting rules that
     attach to any node in the chain, grouped by group_field, and resolve each
@@ -174,4 +174,4 @@ def graph_walk_resolve(registry: DataRegistry, params: GraphWalkResolveParams) -
         created_by="graph_walk_resolve",
         source_handles=[params.nodes_index_handle, params.rules_handle],
     )
-    return PrimitiveOutput(status="ok", handle=new_meta)
+    return OperationOutput(status="ok", handle=new_meta)

@@ -1,4 +1,4 @@
-"""join_lookup: the one primitive in this increment with genuine fan-out risk,
+"""join_lookup: the one operation in this increment with genuine fan-out risk,
 and therefore the one that needs a real cost estimator. Row
 count is estimated *exactly* from the already-built index's bucket sizes,
 before the join runs; byte count is a deliberate over-estimate."""
@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from dale.catalog import ConfirmableParams, PrimitiveOutput, primitive
+from dale.catalog import ConfirmableParams, OperationOutput, operation
 from dale.cost import CostEstimate, make_estimate
 from dale.errors import TypeMismatchError
 from dale.keys import make_key
@@ -25,32 +25,32 @@ class JoinLookupParams(ConfirmableParams):
 
 
 def _bucket_size(index_meta_value_shape: str | None, matched: object) -> int:
-    if index_meta_value_shape == "list":
+    if index_meta_value_shape == "many":
         return len(matched)  # type: ignore[arg-type]
     return 1
 
 
 def _validate_join_handles(registry: DataRegistry, params: JoinLookupParams) -> None:
-    """Shared by the cost estimator and the primitive itself — the estimator
+    """Shared by the cost estimator and the operation itself — the estimator
     runs first (dispatch.py), so validation cannot live only in the latter."""
     base_meta = registry.meta(params.base_handle)
     index_meta = registry.meta(params.index_handle)
-    if base_meta.kind != "list":
+    if base_meta.type != "list":
         raise TypeMismatchError(
-            f"join_lookup base_handle must be a list, got {base_meta.kind!r}",
-            details={"handle": params.base_handle, "kind": base_meta.kind},
+            f"join_lookup base_handle must be a list, got {base_meta.type!r}",
+            details={"handle": params.base_handle, "type": base_meta.type},
         )
-    if index_meta.kind != "dict":
+    if index_meta.type != "dict":
         raise TypeMismatchError(
             f"join_lookup index_handle must be a dict (built via index_by/group_by), "
-            f"got {index_meta.kind!r}",
-            details={"handle": params.index_handle, "kind": index_meta.kind},
+            f"got {index_meta.type!r}",
+            details={"handle": params.index_handle, "type": index_meta.type},
         )
     # A scalar-valued index (priority_reduce) has no fields to read off its
     # values, so the caller must say what to call the value it's merging in.
     # Checked here rather than mid-loop so the model learns before any work
     # happens, and so the cost estimator rejects it on the same terms.
-    if index_meta.value_type == "scalar" and (
+    if index_meta.element_type == "value" and (
         params.fields is None or len(params.fields) != 1
     ):
         raise TypeMismatchError(
@@ -60,7 +60,7 @@ def _validate_join_handles(registry: DataRegistry, params: JoinLookupParams) -> 
             "fields; a priority_reduce index carries only one value per key.",
             details={
                 "handle": params.index_handle,
-                "value_type": index_meta.value_type,
+                "element_type": index_meta.element_type,
                 "fields": params.fields,
             },
         )
@@ -98,10 +98,10 @@ def join_cost_estimator(registry: DataRegistry, params: JoinLookupParams) -> Cos
     return make_estimate(estimated_rows, avg_bytes, registry.limits.max_result_rows)
 
 
-@primitive(
+@operation(
     "join_lookup", JoinLookupParams, cost_estimator=join_cost_estimator, creates_handle=True
 )
-def join_lookup(registry: DataRegistry, params: JoinLookupParams) -> PrimitiveOutput:
+def join_lookup(registry: DataRegistry, params: JoinLookupParams) -> OperationOutput:
     """Merge a list handle against a dict handle built by index_by/group_by,
     matching on one or more fields. how="left" keeps unmatched base records
     as-is; how="inner" drops them. May require confirm=True if the estimated
@@ -122,7 +122,7 @@ def join_lookup(registry: DataRegistry, params: JoinLookupParams) -> PrimitiveOu
                 result.append(dict(record))
             continue
 
-        bucket = matched if index_meta.value_shape == "list" else [matched]
+        bucket = matched if index_meta.value_shape == "many" else [matched]
         for matched_record in bucket:
             merged = dict(record)
             if isinstance(matched_record, dict):
@@ -137,9 +137,9 @@ def join_lookup(registry: DataRegistry, params: JoinLookupParams) -> PrimitiveOu
             else:
                 # Scalar-valued index: bind the value itself under the single
                 # name the caller supplied. _validate_join_handles has already
-                # guaranteed exactly one field when value_type is "scalar";
+                # guaranteed exactly one field when element_type is "value";
                 # this isinstance check is what makes the guarantee unnecessary
-                # to trust -- a mixed-value dict (value_type None) lands here
+                # to trust -- a mixed-value dict (element_type None) lands here
                 # too, and still cannot raise a bare TypeError.
                 if not params.fields or len(params.fields) != 1:
                     raise TypeMismatchError(
@@ -159,4 +159,4 @@ def join_lookup(registry: DataRegistry, params: JoinLookupParams) -> PrimitiveOu
         created_by="join_lookup",
         source_handles=[params.base_handle, params.index_handle],
     )
-    return PrimitiveOutput(status="ok", handle=new_meta)
+    return OperationOutput(status="ok", handle=new_meta)

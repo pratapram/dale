@@ -15,10 +15,10 @@ Entry points: `build_agent`, `run_agent`, `build_tools`, `pick_model`, `ActionLo
 *list* of one because that is what `Agent(tools=...)` takes, and so a second agent-layer tool later
 needs no caller changes.)
 
-`run_plan` submits a list of `steps`, which DALE runs in order; a single primitive call is a list of
+`run_plan` submits a list of `steps`, which DALE runs in order; a single operation call is a list of
 one, not a special case. Each step keeps the exact same Pydantic-validated schema a standalone call
-to that primitive would have — a real discriminated union built from the live catalog, each variant
-carrying its primitive's own docstring, so it can never drift from what `dale.call_primitive`
+to that operation would have — a real discriminated union built from the live catalog, each variant
+carrying its operation's own docstring, so it can never drift from what `dale.call_operation`
 actually accepts. A plan stops at the first step that doesn't succeed and returns everything
 completed so far, and each step is logged as its own real `ActionLog` entry — so a batched call is
 indistinguishable in the resulting trace from the same steps issued one turn at a time.
@@ -28,13 +28,13 @@ the model never chooses between two encodings of the same call.
 
 - `max_steps_per_call=1` caps a plan at one step, reproducing the unbatched, one-call-per-turn
   condition (this is the ablation the paper's evaluation plan needs).
-- `primitives=[...]` restricts which primitives are offered as steps at all. `dale.call_primitive`
+- `operations=[...]` restricts which operations are offered as steps at all. `dale.call_operation`
   stays unrestricted — the allowlist is about the model's action space, not the engine's.
 
 **Per-step fields.** Every step injects one extra required field, `intent` — a short
 natural-language note on why the model is making that specific call. It is stripped before the call
-reaches `dale.call_primitive` (primitives don't know about it) and recorded, alongside the call and
-its result, in an `ActionLog` entry. Separately, handle-creating primitives declare `name` and
+reaches `dale.call_operation` (operations don't know about it) and recorded, alongside the call and
+its result, in an `ActionLog` entry. Separately, handle-creating operations declare `name` and
 `description` on their *own* param schema (not injected here): `name` becomes the handle's real
 identifier in `DataRegistry`, so it must reach dispatch, not just the log.
 
@@ -77,8 +77,8 @@ the provider classes do the authenticating.
 `DataRegistry(privacy_mode=True)` turns on the `strict_privacy` mode (`DESIGN.md`, "Optional
 Strict-Privacy Mode"):
 
-- `peek` is dropped from the primitives offered to the model entirely — it is not among `run_plan`'s
-  step variants at all, so there is nothing to redact. `describe` is the only inspection primitive
+- `peek` is dropped from the operations offered to the model entirely — it is not among `run_plan`'s
+  step variants at all, so there is nothing to redact. `describe` is the only inspection operation
   offered. The default system prompt gets an explicit note saying so, rather than making the model
   spend a turn discovering it.
 - `describe`'s categorical `top_k` *values* are redacted; its numeric aggregate stats and
@@ -102,7 +102,7 @@ entry. Ignored entirely, regardless of its own value, whenever `privacy_mode` is
 ## Repetition nudge and repetition limit
 
 `build_agent(..., repetition_nudge=True)` (default on) — after a call fails (or hits
-`cost_gate_exceeded`) identically — same primitive, same params — three times, its result gets a
+`cost_gate_exceeded`) identically — same operation, same params — three times, its result gets a
 `repetition_warning` field quoting DALE's own already-known error back at the model explicitly,
 instead of silently letting it resend the same rejected call indefinitely. This is mechanical, not
 diagnostic: DALE already has the error, the model just needed to be told it's repeating itself.
@@ -120,7 +120,7 @@ and a limit low enough to break that promise (anything not greater than 3) is re
 Motivated by a real pilot failure: 46 byte-for-byte identical calls that never recovered
 (see the pilot write-up). Note the loop was never *unbounded* — pydantic-ai applies
 `UsageLimits(request_limit=50)` by default — this makes it stop early and with a stated reason
-(`REPETITION_LIMIT_EXCEEDED`, naming the primitive and quoting the real error) instead of late and
+(`REPETITION_LIMIT_EXCEEDED`, naming the operation and quoting the real error) instead of late and
 anonymously.
 
 `AgentLoopTerminated` deliberately does **not** subclass `DaleError`: every `DaleError` describes
@@ -182,8 +182,8 @@ marked `available=False` rather than reported, since their token counts are synt
 ## Where the time goes
 
 Per-call timing lands in the same trace: every `ActionLogEntry` carries `elapsed_ms` (the
-`dale.call_primitive` call itself) and `auto_inspect_ms` (`peek_at_every_step`'s extra
-peek/describe, kept separate so a convenience feature's cost can't hide inside the primitive it
+`dale.call_operation` call itself) and `auto_inspect_ms` (`peek_at_every_step`'s extra
+peek/describe, kept separate so a convenience feature's cost can't hide inside the operation it
 wraps), rendered inline as `Result: ok (2.0 ms + 0.1 ms inspect)`. `ActionLog.total_host_ms` sums
 them, and `run_agent`'s `Result:` block subtracts that from wall clock to show the split:
 

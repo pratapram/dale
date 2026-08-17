@@ -9,7 +9,7 @@ Not part of the `dale` package — this project's own research-validation toolin
 - `harness.py` — `run_trial`/`run_trials`: runs an agent N times against a use case, checks each
   run against ground truth by inspecting registry state after the run (never by parsing the
   model's free-text answer), and reports success rate, failure-mode categorization (by
-  `DaleError` code), the wasted-turn-rate metric (fraction of logged primitive calls that were
+  `DaleError` code), the wasted-turn-rate metric (fraction of logged operation calls that were
   rejected — `cost_gate_exceeded` doesn't count, that's a correct safety response, not a mistake),
   and per-trial token usage.
 
@@ -30,7 +30,7 @@ Not part of the `dale` package — this project's own research-validation toolin
   this covers every trial including `TestModel` ones — elapsed time is real whatever produced it.
   A measured 10,005-row trial: `26.7s wall — 17.9 ms host compute (0.07%), 26.7s model + network`.
   The value of tracking it is not the current number but that it *stays* a rounding error as
-  datasets grow, since primitive cost scales with rows and a round trip doesn't.
+  datasets grow, since operation cost scales with rows and a round trip doesn't.
 
   **Checkers grade the answer, not the route.** A correct result counts however the model shaped
   it — a list of records carrying `account_id`, or `dict_diff` rows keyed `key` with the record
@@ -43,8 +43,8 @@ Not part of the `dale` package — this project's own research-validation toolin
 
   **Reading the failure-mode tally:** most codes describe the model's call (`HANDLE_NOT_FOUND`,
   `TYPE_MISMATCH` — it asked for something wrong, and the error told it so). `INTERNAL_ERROR` is
-  categorically different: it means a primitive dereferenced something it never validated, so the
-  model received `{"message": "primitive execution failed", "details": {}}` and had nothing to act
+  categorically different: it means an operation dereferenced something it never validated, so the
+  model received `{"message": "operation execution failed", "details": {}}` and had nothing to act
   on. **Treat every `INTERNAL_ERROR` in a trial as a DALE defect to file, never as a model
   failure** — an `INTERNAL_ERROR` always means a missing precondition. One such bug
   (`join_lookup` on a `priority_reduce` index) was found exactly this way, from a single
@@ -59,8 +59,8 @@ Not part of the `dale` package — this project's own research-validation toolin
   action log at `debug=True` — full RETURN payloads, useful for exactly the kind of checker-bug
   diagnosis this kind of evaluation needs.
 
-  Every call renders as `handle.primitive(args)` (a receiver method call, not a raw params dict);
-  handle-creating primitives (`PrimitiveSpec.creates_handle`) require the model to supply a `name`
+  Every call renders as `handle.operation(args)` (a receiver method call, not a raw params dict);
+  handle-creating operations (`OperationSpec.creates_handle`) require the model to supply a `name`
   and `description` — `name` is not just a display label, it's the handle's real
   `DataRegistry`-level identifier now (rejected outright on collision with an already-alive handle,
   see `DESIGN.md` Section 2's Pointer-Based State Management), so a call renders as e.g.
@@ -97,7 +97,7 @@ Not part of the `dale` package — this project's own research-validation toolin
   structural checking, not NLP grading of the answer text.
 - `run_trials.py` — CLI entry point. Prints `harness.describe_setup`'s "story" of the use case
   before any trial runs — the task text, which virtual files are registered, the resulting starting
-  handles, and which primitives are available — so you know what the model is working with before
+  handles, and which operations are available — so you know what the model is working with before
   watching it work.
 
 ## Usage
@@ -113,7 +113,7 @@ uv run --env-file .env --extra agent python -m eval.run_trials uc1 anthropic:cla
 uv run --env-file .env --extra agent python -m eval.run_trials uc1 anthropic:claude-sonnet-5 5 \
   --max-requests 25
 
-# Section 4.2 part (F): same use case batched vs. one primitive per round trip
+# Section 4.2 part (F): same use case batched vs. one operation per round trip
 # -- compare the reported mean request count between the two runs. There is only
 # one tool now (run_plan), so the unbatched condition is a one-step ceiling on it
 # rather than a missing tool.

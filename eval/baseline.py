@@ -20,7 +20,7 @@ it can be graded on is what it says.
 
 That asymmetry is deliberate and, we argue, the defensible comparison: each
 arm is graded on the artifact its own architecture actually produces. DALE's
-claim is that a pipeline of primitives computed the right answer, and the
+claim is that a pipeline of operations computed the right answer, and the
 handle is the evidence; the baseline's claim is that a model read the data and
 reported the right answer, and its statement is the evidence. Grading DALE on
 its prose would measure its summarizing, not its computing; grading the
@@ -202,15 +202,15 @@ def build_baseline_prompt(registry: dale.DataRegistry, task: str, *, fmt: str = 
     """The whole naive prompt: every alive handle's *full* contents, then the
     same task text the DALE arm is given.
 
-    Handles carry a one-line header (name, kind, size, description) because a
+    Handles carry a one-line header (name, type, size, description) because a
     baseline without them would be unfairly hard — the model would have to
     guess which anonymous table is which — and part (C) is a claim about
     context size, not about handicapping the comparison."""
     blocks = [_PREAMBLE]
     for meta in registry.list_handles():
-        body, used = serialize_value(registry.materialize(meta.handle), fmt)
+        body, used = serialize_value(registry.materialize(meta.name), fmt)
         blocks.append(
-            f"## {meta.handle} ({meta.kind}, {meta.size} records, {used}) — "
+            f"## {meta.name} ({meta.type}, {meta.size} records, {used}) — "
             f"{meta.description}\n{body}"
         )
     blocks.append(f"## Task\n{task}")
@@ -653,7 +653,7 @@ def run_baseline_trial(
     twin, so both arms report token spend through the same TokenUsage fields
     and can be put side by side without a translation step. The one field that
     doesn't apply is `action_log`, which stays empty — a baseline run makes no
-    primitive calls, and an empty log is the truthful way to say so (it makes
+    operation calls, and an empty log is the truthful way to say so (it makes
     the wasted-turn and host-time metrics read as zero-of-zero rather than as
     a suspiciously perfect score).
 

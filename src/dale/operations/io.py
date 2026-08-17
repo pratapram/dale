@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from dale.catalog import PrimitiveOutput, primitive
+from dale.catalog import OperationOutput, operation
 from dale.errors import FileNotRegisteredError, LoadError
 from dale.registry import DataRegistry
 
@@ -57,8 +57,8 @@ def _resolve_registered_file(registry: DataRegistry, file: str) -> Path:
     return path
 
 
-@primitive("load_csv", LoadCsvParams, creates_handle=True)
-def load_csv(registry: DataRegistry, params: LoadCsvParams) -> PrimitiveOutput:
+@operation("load_csv", LoadCsvParams, creates_handle=True)
+def load_csv(registry: DataRegistry, params: LoadCsvParams) -> OperationOutput:
     """Load a CSV file, referenced by an invoker-registered virtual name (not
     a raw path — see FileRegistry), into a new list-of-records handle, with
     deterministic type inference (int, then float, else string; blank ->
@@ -80,7 +80,7 @@ def load_csv(registry: DataRegistry, params: LoadCsvParams) -> PrimitiveOutput:
     meta = registry.create(
         "list", rows, name=params.name, description=params.description, created_by="load_csv"
     )
-    return PrimitiveOutput(status="ok", handle=meta)
+    return OperationOutput(status="ok", handle=meta)
 
 
 class LoadJsonParams(BaseModel):
@@ -110,19 +110,19 @@ def _unwrap_envelope(data: dict[str, Any], file: str) -> list[Any]:
     return data[list_keys[0]]
 
 
-@primitive("load_json", LoadJsonParams, creates_handle=True)
-def load_json(registry: DataRegistry, params: LoadJsonParams) -> PrimitiveOutput:
+@operation("load_json", LoadJsonParams, creates_handle=True)
+def load_json(registry: DataRegistry, params: LoadJsonParams) -> OperationOutput:
     """Load a JSON file, referenced by an invoker-registered virtual name (not
     a raw path — see FileRegistry), into a new handle. A top-level JSON array
     becomes a list handle, a top-level JSON object becomes a dict handle —
-    JSON is a loading path, not a new handle kind.
+    JSON is a loading path, not a new handle type.
     Many enterprise APIs (Salesforce, ServiceNow, Stripe...) wrap their real
     payload in an envelope object, e.g. {"records": [...]}; if the model
     recognizes this shape it can pass remove_envelope=True to unwrap straight
     to a list handle instead of a dict handle wrapping one. DALE never guesses
     this on its own — remove_envelope defaults to False, and a top-level array
     ignores the flag entirely (nothing to unwrap). Nested/irregular structure
-    inside the result is otherwise preserved as-is; other primitives (peek,
+    inside the result is otherwise preserved as-is; other operations (peek,
     flatten_json) are how the model inspects and reshapes it. Local files
     only — never a network or database connection."""
     path = _resolve_registered_file(registry, params.file)
@@ -160,4 +160,4 @@ def load_json(registry: DataRegistry, params: LoadJsonParams) -> PrimitiveOutput
             details={"file": params.file},
         )
 
-    return PrimitiveOutput(status="ok", handle=meta)
+    return OperationOutput(status="ok", handle=meta)

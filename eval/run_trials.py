@@ -9,7 +9,7 @@ not a real correctness signal. Token figures are suppressed for it, since
 TestModel reports synthetic usage (see dale.agent.TokenUsage).
 
 Flags:
-  --steps-per-call N cap how many primitive calls the model may batch into one
+  --steps-per-call N cap how many operation calls the model may batch into one
                      turn. `1` is the unbatched condition: run a use case with
                      and without it and compare the reported mean request count
                      — that comparison is paper.md Section 4.2 part (F).

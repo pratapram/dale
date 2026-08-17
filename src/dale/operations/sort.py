@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from dale.catalog import PrimitiveOutput, primitive
+from dale.catalog import OperationOutput, operation
 from dale.errors import TypeMismatchError
 from dale.registry import DataRegistry
 
@@ -36,15 +36,15 @@ def _sort_by_single_key(records: list[dict], field: str, descending: bool) -> li
     return with_value + without_value
 
 
-@primitive("sort_by", SortByParams, bounded_by_input=True, creates_handle=True)
-def sort_by(registry: DataRegistry, params: SortByParams) -> PrimitiveOutput:
+@operation("sort_by", SortByParams, bounded_by_input=True, creates_handle=True)
+def sort_by(registry: DataRegistry, params: SortByParams) -> OperationOutput:
     """Stable multi-key sort of a list handle. Records missing a sort field
     are sorted last regardless of ascending/descending. Returns a new handle."""
     meta = registry.meta(params.handle)
-    if meta.kind != "list":
+    if meta.type != "list":
         raise TypeMismatchError(
-            f"sort_by requires a list handle, got {meta.kind!r}",
-            details={"handle": params.handle, "kind": meta.kind},
+            f"sort_by requires a list handle, got {meta.type!r}",
+            details={"handle": params.handle, "type": meta.type},
         )
 
     result = list(registry.get(params.handle))
@@ -61,4 +61,4 @@ def sort_by(registry: DataRegistry, params: SortByParams) -> PrimitiveOutput:
         created_by="sort_by",
         source_handles=[params.handle],
     )
-    return PrimitiveOutput(status="ok", handle=new_meta)
+    return OperationOutput(status="ok", handle=new_meta)

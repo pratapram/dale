@@ -17,7 +17,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from dale.catalog import PrimitiveOutput, primitive
+from dale.catalog import OperationOutput, operation
 from dale.errors import ExportError, FileNotRegisteredError, TypeMismatchError
 from dale.registry import DataRegistry
 
@@ -31,18 +31,18 @@ class ExportHandleParams(BaseModel):
     """Defaults to whatever `destination`'s own extension implies (.csv/.json)
     — inferred from the virtual name the LLM supplied, not the real resolved
     path, since that's the only part of the destination the LLM actually
-    sees/chose. Falls back to kind (csv for list, json for dict/set — not
+    sees/chose. Falls back to the handle's type (csv for list, json for dict/set — not
     tabular, csv would lose structure) only if the name has neither
     extension."""
 
 
-def _resolve_format(requested: Format | None, destination: str, kind: str) -> Format:
+def _resolve_format(requested: Format | None, destination: str, handle_type: str) -> Format:
     if requested is not None:
         return requested
     suffix = destination.rsplit(".", 1)[-1].lower() if "." in destination else ""
     if suffix in ("csv", "json"):
         return suffix  # type: ignore[return-value]
-    return "csv" if kind == "list" else "json"
+    return "csv" if handle_type == "list" else "json"
 
 
 def _write_csv(path: Path, value: list[dict]) -> int:
@@ -62,15 +62,15 @@ def _write_csv(path: Path, value: list[dict]) -> int:
     return len(value)
 
 
-def _write_json(path: Path, value: Any, kind: str) -> int:
-    serializable = list(value) if kind == "set" else value
+def _write_json(path: Path, value: Any, handle_type: str) -> int:
+    serializable = list(value) if handle_type == "set" else value
     with path.open("w", encoding="utf-8") as f:
         json.dump(serializable, f, indent=2, default=str)
     return path.stat().st_size
 
 
-@primitive("export_handle", ExportHandleParams)
-def export_handle(registry: DataRegistry, params: ExportHandleParams) -> PrimitiveOutput:
+@operation("export_handle", ExportHandleParams)
+def export_handle(registry: DataRegistry, params: ExportHandleParams) -> OperationOutput:
     """Write a handle's real content to a registered output destination.
     Returns only a confirmation (format, row/byte count) — never the
     exported values themselves, so final results can leave the system
@@ -90,11 +90,11 @@ def export_handle(registry: DataRegistry, params: ExportHandleParams) -> Primiti
 
     meta = registry.meta(params.handle)
     value = registry.get(params.handle)
-    fmt = _resolve_format(params.format, params.destination, meta.kind)
-    if fmt == "csv" and meta.kind != "list":
+    fmt = _resolve_format(params.format, params.destination, meta.type)
+    if fmt == "csv" and meta.type != "list":
         raise TypeMismatchError(
-            f"csv export requires a list handle, got {meta.kind!r}",
-            details={"handle": params.handle, "kind": meta.kind},
+            f"csv export requires a list handle, got {meta.type!r}",
+            details={"handle": params.handle, "type": meta.type},
         )
 
     try:
@@ -102,7 +102,7 @@ def export_handle(registry: DataRegistry, params: ExportHandleParams) -> Primiti
             count = _write_csv(path, value)
             unit = "rows"
         else:
-            count = _write_json(path, value, meta.kind)
+            count = _write_json(path, value, meta.type)
             unit = "bytes"
     except OSError as exc:
         raise ExportError(
@@ -110,7 +110,7 @@ def export_handle(registry: DataRegistry, params: ExportHandleParams) -> Primiti
             details={"destination": params.destination},
         ) from exc
 
-    return PrimitiveOutput(
+    return OperationOutput(
         status="ok",
         result={
             "handle": params.handle,

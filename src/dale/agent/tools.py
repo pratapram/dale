@@ -1,14 +1,14 @@
 """Building the one tool the model is offered.
 
-`run_plan` is the only tool DALE publishes; a single primitive call is a
+`run_plan` is the only tool DALE publishes; a single operation call is a
 `steps` list of length one. `steps` is a real pydantic discriminated union
-over every selected primitive's own parameter schema, so each step keeps full
-validation against the primitive it names — the model chooses from the same
+over every selected operation's own parameter schema, so each step keeps full
+validation against the operation it names — the model chooses from the same
 closed, structured-parameter grammar described in paper.md Section 3.2, just
 submitting several choices in one message instead of one per message.
 
-This module owns what goes on the wire: which primitives are offered
-(`_selected_primitives`), what each step's schema looks like
+This module owns what goes on the wire: which operations are offered
+(`_selected_operations`), what each step's schema looks like
 (`_params_for_plan_step`), what is trimmed from it (`_UntitledToolJsonSchema`),
 and how a validated step becomes the plain dict dispatch takes (`_call_params`).
 """
@@ -30,20 +30,20 @@ from dale.agent.execution import (
 from dale.agent.log import ActionLog, Verbosity, render_raw_messages
 
 
-def _selected_primitives(
-    primitives: Sequence[str] | None, *, privacy_mode: bool
+def _selected_operations(
+    operations: Sequence[str] | None, *, privacy_mode: bool
 ) -> list[str]:
-    """Which primitives the model is offered as `run_plan` steps — the single
+    """Which operations the model is offered as `run_plan` steps — the single
     place either filter below is applied, so there is no second copy to drift.
 
-    `primitives` (default `None` = the whole catalog, today's behaviour) is the
+    `operations` (default `None` = the whole catalog, today's behaviour) is the
     caller's allowlist, for a deployment that knows its task needs nine of the
     seventeen. An unknown name is a ValueError, not a silent drop: a typo would
     otherwise shrink the catalog and surface many model turns later as an
     inexplicable "it never tried filter_where". Read as a set against
-    `dale.list_primitives()` order, so a caller's ordering or a duplicate can't
+    `dale.list_operations()` order, so a caller's ordering or a duplicate can't
     reorder the published union. This governs what the *model* is offered only;
-    `dale.call_primitive` stays unrestricted, since a host loading its own
+    `dale.call_operation` stays unrestricted, since a host loading its own
     fixtures is not the party being constrained.
 
     `privacy_mode` then drops `peek` unconditionally — not merely redacted at
@@ -53,15 +53,15 @@ def _selected_primitives(
     fully functional: its aggregate statistics were never "individual real
     values" under this design's own definition, only categorical top_k is
     redacted."""
-    catalog = dale.list_primitives()
-    if primitives is not None:
-        unknown = sorted(set(primitives) - set(catalog))
+    catalog = dale.list_operations()
+    if operations is not None:
+        unknown = sorted(set(operations) - set(catalog))
         if unknown:
             raise ValueError(
-                f"unknown primitive(s) in the `primitives` allowlist: {unknown}. "
-                f"Known primitives: {sorted(catalog)}"
+                f"unknown operation(s) in the `operations` allowlist: {unknown}. "
+                f"Known operations: {sorted(catalog)}"
             )
-        allowed = set(primitives)
+        allowed = set(operations)
     else:
         allowed = set(catalog)
     selected = [n for n in catalog if n in allowed and not (privacy_mode and n == "peek")]
@@ -70,13 +70,13 @@ def _selected_primitives(
         # `Union[tuple([])]` and surfaces as "TypeError: Cannot take a Union of
         # no types" from inside `typing`, naming nothing the caller wrote. The
         # privacy_mode clause keys on peek having actually been in the allowlist
-        # rather than on the flag being on, so an empty `primitives=[]` under
+        # rather than on the flag being on, so an empty `operations=[]` under
         # privacy_mode doesn't send the reader off to fix the wrong thing.
-        dropped_peek = privacy_mode and primitives is not None and "peek" in primitives
+        dropped_peek = privacy_mode and operations is not None and "peek" in operations
         raise ValueError(
-            "the `primitives` allowlist selects no primitives at all"
+            "the `operations` allowlist selects no operations at all"
             + (" once privacy_mode drops peek" if dropped_peek else "")
-            + f" (got {list(primitives) if primitives is not None else None!r}), so "
+            + f" (got {list(operations) if operations is not None else None!r}), so "
             f"run_plan would have no step type the model could ever submit."
         )
     return selected
@@ -91,23 +91,23 @@ def build_tools(
     repetition_limit: int | None = _REPETITION_LIMIT_DEFAULT,
     privacy_mode: bool = False,
     max_steps_per_call: int | None = None,
-    primitives: Sequence[str] | None = None,
+    operations: Sequence[str] | None = None,
 ) -> list[Tool]:
     """The model's entire tool surface: exactly one PydanticAI Tool, `run_plan`,
-    whose `steps` are a discriminated union generated from the live primitive
-    catalog — so it always matches what dale.call_primitive accepts, being built
-    from the same PrimitiveSpec rather than hand-maintained.
+    whose `steps` are a discriminated union generated from the live operation
+    catalog — so it always matches what dale.call_operation accepts, being built
+    from the same OperationSpec rather than hand-maintained.
 
-    A single primitive call is a `steps` list of length one. That is the whole
-    design: no second, per-primitive tool surface, so the catalog is published
+    A single operation call is a `steps` list of length one. That is the whole
+    design: no second, per-operation tool surface, so the catalog is published
     once per request instead of twice and the model never chooses between two
     encodings of the same call. Returns a list of one because that is what
     `Agent(tools=...)` takes, and so a second agent-layer tool later needs no
     caller changes.
 
     This function is now a delegation, and each parameter is documented where it
-    is actually used rather than restated here: `primitives`/`privacy_mode` in
-    _selected_primitives; `verbosity` on the `Verbosity` alias;
+    is actually used rather than restated here: `operations`/`privacy_mode` in
+    _selected_operations; `verbosity` on the `Verbosity` alias;
     `peek_at_every_step`, `repetition_nudge` and `repetition_limit` in
     _execute_and_log_step, which is the choke point all three act at (and
     _REPETITION_LIMIT_DEFAULT / _validate_repetition_limit for what values that
@@ -117,11 +117,11 @@ def build_tools(
 
     `max_steps_per_call` (default `None` = unbounded) replaces the old
     `enable_run_plan` flag, and names what it actually does. `1` reproduces the
-    unbatched condition — one primitive per round trip — which is what paper.md
+    unbatched condition — one operation per round trip — which is what paper.md
     Section 4.2 part (F)'s batched-vs-unbatched ablation needs now that there is
     no second tool to withhold.
 
-    Handle-creating primitives declare `name`/`description` directly on their
+    Handle-creating operations declare `name`/`description` directly on their
     own param schema (not injected here) — `name` is the LLM-supplied identifier
     registry.create() uses as the handle itself (rejected outright on collision
     with an alive handle), and `description` is mandatory on every handle for the
@@ -146,15 +146,15 @@ def build_tools(
             repetition_limit=repetition_limit,
             privacy_mode=privacy_mode,
             max_steps_per_call=max_steps_per_call,
-            primitives=primitives,
+            operations=operations,
         )
     ]
 
 
 def _call_params(params: BaseModel, *, exclude: set[str]) -> dict[str, Any]:
-    """The model's tool-call arguments as the plain dict `dale.call_primitive`
-    takes, minus the agent-layer-only fields primitives themselves don't know
-    about (`intent` always; `primitive` too, for a run_plan step).
+    """The model's tool-call arguments as the plain dict `dale.call_operation`
+    takes, minus the agent-layer-only fields operations themselves don't know
+    about (`intent` always; `operation` too, for a run_plan step).
 
     `exclude_unset=True`, deliberately, and the distinction from the
     `exclude_none=True` this used to pass is not cosmetic — it was a live bug,
@@ -182,7 +182,7 @@ def _call_params(params: BaseModel, *, exclude: set[str]) -> dict[str, Any]:
     defaulted field (`confirm`, `how`, `as`, `carry_fields`, `n`) is simply
     absent from the dict, so `spec.param_schema.model_validate` re-applies
     exactly the same default it would have applied anyway — including the
-    `confirm` that `dispatch.call_primitive`'s cost gate reads. What it stops
+    `confirm` that `dispatch.call_operation`'s cost gate reads. What it stops
     doing is second-guessing a null the model chose to send: an explicitly
     supplied `None` now reaches validation, where the schema — the same schema
     the model was shown — decides whether it is legal.
@@ -191,7 +191,7 @@ def _call_params(params: BaseModel, *, exclude: set[str]) -> dict[str, Any]:
     than hedging, because the obvious worry — "won't a model that sends
     `carry_fields: null` now get an error where it used to be quietly repaired?"
     — turns out not to be reachable. By the time this function runs, `params`
-    is an already-validated instance of the primitive's own param model: a null
+    is an already-validated instance of the operation's own param model: a null
     for any field whose schema forbids one (`carry_fields`, `remove_envelope`,
     `n`, `how`, `confirm`, `as` — checked individually, that is all of them)
     was rejected one layer earlier, by pydantic-ai, identically before and
@@ -221,7 +221,7 @@ class _UntitledToolJsonSchema(GenerateToolJsonSchema):
     Hooking pydantic's own per-model emitter rather than post-processing the
     finished schema is deliberate: a recursive walk that deletes every `title`
     key it meets cannot tell a schema from arbitrary data, so it also reaches
-    into `default`, `const`, `enum` and `examples` values — a primitive with
+    into `default`, `const`, `enum` and `examples` values — an operation with
     `default={"title": "Mr"}` would have its default silently rewritten. This
     can only ever see a model's own schema node.
 
@@ -236,24 +236,24 @@ class _UntitledToolJsonSchema(GenerateToolJsonSchema):
         return emitted
 
 
-def _params_for_plan_step(name: str, spec: dale.PrimitiveSpec) -> type[BaseModel]:
-    """One `steps` variant: the primitive's own param model, plus a
-    `primitive: Literal[name]` discriminator field — what lets run_plan's
+def _params_for_plan_step(name: str, spec: dale.OperationSpec) -> type[BaseModel]:
+    """One `steps` variant: the operation's own param model, plus an
+    `operation: Literal[name]` discriminator field — what lets run_plan's
     `steps: list[PlanStep]` be a real pydantic discriminated union (each
-    step keeps full validation against its own primitive's actual schema,
+    step keeps full validation against its own operation's actual schema,
     not a hand-parsed `dict`) — plus its own per-step `intent`: a batched step
     is a full ActionLog entry in its own right, not a sub-item of one
     "batch intent", consistent with _execute_and_log_step logging it exactly
     like a standalone call.
 
-    `__doc__` carries the primitive's own docstring, in full, because pydantic
+    `__doc__` carries the operation's own docstring, in full, because pydantic
     promotes it into the variant's schema `description` and JSON Schema has no
     other per-variant equivalent of a tool's `description`. Not a nicety: while
-    each primitive also had a named tool, that tool carried the docstring and
+    each operation also had a named tool, that tool carried the docstring and
     these variants all shipped `description: None`, unnoticed because the
     information was still on the wire somewhere. Under batch-only nothing else
     carries it, so leaving them null would have the model selecting among 17
-    primitives on name and parameter shape alone — a 7,474-token *information
+    operations on name and parameter shape alone — a 7,474-token *information
     deficit*, not a saving, and the easiest way to make this change look like a
     win while degrading what it exists to serve.
 
@@ -268,13 +268,13 @@ def _params_for_plan_step(name: str, spec: dale.PrimitiveSpec) -> type[BaseModel
     what it is for once, rather than 17 copies of one sentence. Its
     *requiredness* is not documentation and stays here."""
     fields: dict[str, Any] = {
-        "primitive": (Literal[name], Field(..., description=f"Must be {name!r}.")),
+        "operation": (Literal[name], Field(..., description=f"Must be {name!r}.")),
         "intent": (str, Field(...)),
     }
     return create_model(
         f"{spec.param_schema.__name__}PlanStep",
         __base__=spec.param_schema,
-        __doc__=(spec.fn.__doc__ or f"DALE primitive: {name}").strip(),
+        __doc__=(spec.fn.__doc__ or f"DALE operation: {name}").strip(),
         **fields,
     )
 
@@ -288,16 +288,16 @@ def _build_run_plan_tool(
     repetition_limit: int | None,
     privacy_mode: bool,
     max_steps_per_call: int | None = None,
-    primitives: Sequence[str] | None = None,
+    operations: Sequence[str] | None = None,
 ) -> Tool:
-    """`run_plan` — agent-layer orchestration, not a `@primitive`/catalog
+    """`run_plan` — agent-layer orchestration, not an `@operation`/catalog
     entry (it doesn't operate on data itself, so it isn't in
-    dale.list_primitives() and can't recursively appear as one of its own
+    dale.list_operations() and can't recursively appear as one of its own
     steps). The model's only tool: it submits a sequence of steps, which DALE
     runs in order in a plain Python loop — see the design notes
     "Plan/batch tool" entry for the full design rationale this implements.
     Every step goes through `_execute_and_log_step` — the exact same
-    dale.call_primitive path, its own real ActionLog entry,
+    dale.call_operation path, its own real ActionLog entry,
     peek_at_every_step's auto_inspect — so a step arriving as part of a batch
     is indistinguishable in the resulting trace from one that arrived alone,
     and a `steps` list of length one is not a special case but the trivial
@@ -333,7 +333,7 @@ def _build_run_plan_tool(
     partial-results treatment described above. Left as a documented
     tradeoff (see paper.md) rather than "fixed", since fixing it would mean
     giving up per-step Pydantic validation — the whole reason a
-    discriminated union was chosen over a raw `list[dict]` a primitive
+    discriminated union was chosen over a raw `list[dict]` an operation
     would have to hand-validate itself.
 
     That tradeoff is what `_TOOL_MAX_RETRIES` exists to blunt: it is now the
@@ -347,10 +347,10 @@ def _build_run_plan_tool(
             f"would publish a tool the model is unable to call at all."
         )
     plan_step_models = [
-        _params_for_plan_step(name, dale.get_primitive(name))
-        for name in _selected_primitives(primitives, privacy_mode=privacy_mode)
+        _params_for_plan_step(name, dale.get_operation(name))
+        for name in _selected_operations(operations, privacy_mode=privacy_mode)
     ]
-    PlanStep = Annotated[Union[tuple(plan_step_models)], Field(discriminator="primitive")]
+    PlanStep = Annotated[Union[tuple(plan_step_models)], Field(discriminator="operation")]
 
     class RunPlanParams(BaseModel):
         steps: list[PlanStep] = Field(
@@ -358,11 +358,11 @@ def _build_run_plan_tool(
             min_length=1,
             max_length=max_steps_per_call,
             description=(
-                "A sequence of primitive calls to run in order, in this one turn, "
+                "A sequence of operation calls to run in order, in this one turn, "
                 "when you already know the shape of what you need -- e.g. a filter "
                 "followed by a sort, or several steps building toward one result. "
                 "Each step takes exactly the same params a normal one-off call to "
-                "that primitive would, plus its own `primitive` name and `intent`. "
+                "that operation would, plus its own `operation` name and `intent`. "
                 "Stops at the first step that doesn't succeed and returns everything "
                 "completed so far, including the failure, so a bad step 3 doesn't "
                 "lose steps 1-2's real results."
@@ -378,11 +378,11 @@ def _build_run_plan_tool(
 
         results: list[dict] = []
         for step in params.steps:
-            call_params = _call_params(step, exclude={"primitive", "intent"})
+            call_params = _call_params(step, exclude={"operation", "intent"})
             payload = _execute_and_log_step(
                 ctx.deps,
                 action_log,
-                primitive=step.primitive,
+                operation=step.operation,
                 intent=step.intent,
                 call_params=call_params,
                 peek_at_every_step=peek_at_every_step,
@@ -411,8 +411,8 @@ def _build_run_plan_tool(
         max_retries=_TOOL_MAX_RETRIES,
         schema_generator=_UntitledToolJsonSchema,
         description=(
-            "Run a sequence of primitive calls in order, in one turn. Every "
-            "primitive is reached through this tool: one step is a single call, "
+            "Run a sequence of operation calls in order, in one turn. Every "
+            "operation is reached through this tool: one step is a single call, "
             "several steps are a plan you already know the shape of -- e.g. a filter "
             "then a sort, or several steps building toward one result. Each step is "
             "logged and executed exactly as if you'd called it on its own; stops at "

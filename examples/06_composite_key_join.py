@@ -25,11 +25,11 @@ price_feed = registry.create(
 
 # index_by with key_fields=[...] (plural) builds a tuple-keyed dict when more
 # than one field is given — a composite key, not a fourth primary type.
-price_index = dale.call_primitive(
+price_index = dale.call_operation(
     registry,
     "index_by",
     {
-        "handle": price_feed.handle,
+        "handle": price_feed.name,
         "key_fields": ["supplier", "sku"],
         "name": "price_index",
         "description": "price_feed indexed by (supplier, sku)",
@@ -53,12 +53,12 @@ orders = registry.create(
 # join_lookup: merge price info into orders by the same composite key.
 # how="left" keeps unmatched rows (A9 stays without a price); how="inner"
 # would drop them instead.
-joined = dale.call_primitive(
+joined = dale.call_operation(
     registry,
     "join_lookup",
     {
-        "base_handle": orders.handle,
-        "index_handle": price_index.handle.handle,
+        "base_handle": orders.name,
+        "index_handle": price_index.handle.name,
         "on": ["supplier", "sku"],
         "how": "left",
         "name": "joined",
@@ -67,7 +67,7 @@ joined = dale.call_primitive(
 )
 
 print("\nJoined orders:")
-for row in registry.materialize(joined.handle.handle):
+for row in registry.materialize(joined.handle.name):
     price = row.get("price", "—")
     print(f"  {row['supplier']:<8} {row['sku']:<4} qty={row['qty']:<3} price={price}")
 
@@ -84,15 +84,15 @@ events = registry.create(
     description="per-supplier-and-sku event log",
     created_by="example_script",
 )
-grouped = dale.call_primitive(
+grouped = dale.call_operation(
     registry,
     "group_by",
     {
-        "handle": events.handle,
+        "handle": events.name,
         "key_fields": ["supplier", "sku"],
         "name": "events_grouped",
         "description": "events bucketed by (supplier, sku)",
     },
 )
-bucket = registry.materialize(grouped.handle.handle)[("acme", "A1")]
+bucket = registry.materialize(grouped.handle.name)[("acme", "A1")]
 print(f"\nEvents for (acme, A1): {[e['event'] for e in bucket]}")

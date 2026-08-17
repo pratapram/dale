@@ -2,9 +2,9 @@
 
 Run: uv run python examples/05_filter_sort_compute.py
 
-Demonstrates the core idea: every step is a declarative primitive call, never
+Demonstrates the core idea: every step is a declarative operation call, never
 generated code. The "LLM" in a real deployment would be choosing these same
-primitive names and structured arguments — here we call them directly.
+operation names and structured arguments — here we call them directly.
 """
 
 from __future__ import annotations
@@ -40,11 +40,11 @@ products = registry.create(
 # predicates an LLM constructs (see examples/04).
 predicate = {"field": "in_stock", "op": "==", "value": True}
 print(f"predicate: {dale.render_predicate(_predicate_adapter.validate_python(predicate))}")
-in_stock = dale.call_primitive(
+in_stock = dale.call_operation(
     registry,
     "filter_where",
     {
-        "handle": products.handle,
+        "handle": products.name,
         "predicate": predicate,
         "name": "in_stock",
         "description": "products currently in stock",
@@ -54,11 +54,11 @@ print(f"in_stock: {in_stock.handle.size} of {products.size} products")
 
 # compute_field: derive profit margin. `left`/`right` are tagged so there's
 # never ambiguity between "a field name" and "a literal value".
-with_margin = dale.call_primitive(
+with_margin = dale.call_operation(
     registry,
     "compute_field",
     {
-        "handle": in_stock.handle.handle,
+        "handle": in_stock.handle.name,
         "as": "margin",
         "op": "subtract",
         "left": {"field": "price"},
@@ -69,11 +69,11 @@ with_margin = dale.call_primitive(
 )
 
 # sort_by: highest margin first.
-sorted_result = dale.call_primitive(
+sorted_result = dale.call_operation(
     registry,
     "sort_by",
     {
-        "handle": with_margin.handle.handle,
+        "handle": with_margin.handle.name,
         "keys": [{"field": "margin", "order": "desc"}],
         "name": "sorted_by_margin",
         "description": "in-stock products sorted by margin, descending",
@@ -82,19 +82,19 @@ sorted_result = dale.call_primitive(
 
 # peek: a small sample, never the full dataset — this is what an LLM would
 # see if it wanted to sanity-check the result shape.
-sample = dale.call_primitive(registry, "peek", {"handle": sorted_result.handle.handle, "n": 10})
+sample = dale.call_operation(registry, "peek", {"handle": sorted_result.handle.name, "n": 10})
 print("\nResult (sorted by margin, descending):")
 for row in sample.result["sample"]:
     print(f"  {row['name']:<10} margin={row['margin']:.2f}")
 
 # describe: aggregate statistics, never individual values dumped in bulk.
-stats = dale.call_primitive(
-    registry, "describe", {"handle": sorted_result.handle.handle, "field": "margin"}
+stats = dale.call_operation(
+    registry, "describe", {"handle": sorted_result.handle.name, "field": "margin"}
 )
 print(f"\nmargin stats: min={stats.result['min']:.2f} max={stats.result['max']:.2f} "
       f"mean={stats.result['mean']:.2f}")
 
 # release_handle: explicit cleanup once a handle is no longer needed.
-for h in (products.handle, in_stock.handle.handle, with_margin.handle.handle):
-    dale.call_primitive(registry, "release_handle", {"handle": h})
+for h in (products.name, in_stock.handle.name, with_margin.handle.name):
+    dale.call_operation(registry, "release_handle", {"handle": h})
 print(f"\nhandles remaining after cleanup: {registry.handle_count()}")

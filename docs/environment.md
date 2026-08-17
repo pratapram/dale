@@ -11,11 +11,11 @@ page is the checklist of preconditions, not a tutorial — see the README's Quic
 
 **`pip install dale-engine` — core only, for a different agent loop.** If you are driving DALE from the
 OpenAI SDK, LangChain, or your own loop rather than [PydanticAI](https://ai.pydantic.dev/)'s, the
-core install gives you the whole engine — all 17 primitives, the registry, the declarative grammar,
-cost estimation, `register_primitive` — without the provider SDKs. That is **6 packages and 8 MB**,
+core install gives you the whole engine — all 17 operations, the registry, the declarative grammar,
+cost estimation, `register_operation` — without the provider SDKs. That is **6 packages and 8 MB**,
 against **103 packages and 103 MB** for the `agent` extra, which pulls the Anthropic, OpenAI and
-Google SDKs plus a full OpenTelemetry stack. Every primitive's parameters are a pydantic model, so
-`dale.get_primitive("filter_where").param_schema.model_json_schema()` gives you a tool schema for
+Google SDKs plus a full OpenTelemetry stack. Every operation's parameters are a pydantic model, so
+`dale.get_operation("filter_where").param_schema.model_json_schema()` gives you a tool schema for
 any framework. Core `dale` needs only `pydantic>=2.6`, and has **zero network dependency and needs
 no credentials at all** — a real property, not just an omission ([`DESIGN.md`](../DESIGN.md)'s
 Build-Time Extensibility section states this explicitly: no live connectors means no network access
@@ -28,7 +28,7 @@ applies). The invoker registers each file the LLM should be able to load under a
 "/secure/data/sales.csv")` — and passes it to `DataRegistry(files=files)`. The LLM only ever picks
 among names the invoker explicitly registered; it never sees or constructs a raw filesystem path.
 This isn't just tidiness — `load_csv`'s `path` parameter used to accept an LLM-constructed string
-directly, which is an unrestricted local file *read* primitive with no scoping (bounded only by the
+directly, which is an unrestricted local file *read* operation with no scoping (bounded only by the
 running process's own OS file permissions). `FileRegistry` closes that the same way `DataRegistry`
 already closes the equivalent problem for in-memory data: opaque references the host controls,
 never a raw address/path the LLM supplies itself. There's no schema file to prepare upfront —
@@ -47,13 +47,13 @@ target need not exist yet (that's the point), but its parent directory must.
 `pick_model()`/pydantic-ai's provider classes. With no `DALE_MODEL` set, the first key found decides
 both provider and model — see [the default-model table](agent.md#build_agent-and-pick_model), which
 also gives the order they're checked in. `DALE_MODEL` overrides all of it with a literal model
-string, e.g. `DALE_MODEL="moonshotai:kimi-k2.6"`. Core DALE (direct `dale.call_primitive` calls, no
+string, e.g. `DALE_MODEL="moonshotai:kimi-k2.6"`. Core DALE (direct `dale.call_operation` calls, no
 LLM) needs none of this.
 
 **Initial data.** The invoker constructs a fresh `dale.DataRegistry()` (with a `FileRegistry` if
-any `load_csv` calls are expected) and populates it — either via `load_csv` primitive calls (the
+any `load_csv` calls are expected) and populates it — either via `load_csv` operation calls (the
 LLM's own call, or the invoker's, against pre-registered virtual names), or directly via
-`registry.create(kind, value, name=..., description=..., created_by=...)` for data already in
+`registry.create(type, value, name=..., description=..., created_by=...)` for data already in
 memory — *before* the agent runs. `name` becomes the handle itself and must be a valid Python
 identifier that no live handle already uses; `description` is mandatory, and an honest "unknown,
 uninspected data" is a complete answer when true. DALE never has data it wasn't given; there's no
@@ -83,7 +83,7 @@ process) is explicitly not built into DALE — today that's entirely the invoker
 
 **Process lifecycle.** One `DataRegistry` per invocation, never reused across sessions/users
 — no cross-session state, no persistence, nothing survives past the process.
-Tool calls within a session are assumed strictly sequential — no concurrent primitive calls. The
+Tool calls within a session are assumed strictly sequential — no concurrent operation calls. The
 single-tenant, one-dedicated-process-per-invocation deployment model is an
 assumption DALE's resource-governance design depends on, not something DALE creates or enforces —
 providing that isolation (a container, a subprocess, a sandboxed worker) is the invoker's job.

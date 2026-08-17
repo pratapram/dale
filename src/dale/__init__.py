@@ -2,25 +2,25 @@
 
 An LLM manipulates in-memory data (list/dict/set, held behind opaque handles
 in a DataRegistry) exclusively through a small, closed set of declarative
-primitives — never by generating or executing code. See DESIGN.md and
+operations — never by generating or executing code. See README.md and
 DESIGN.md for the full architecture and design rationale.
 
-Importing this package registers every built-in primitive into the catalog
-(via `dale.primitives`), so `dale.call_primitive(...)` works immediately.
+Importing this package registers every built-in operation into the catalog
+(via `dale.operations`), so `dale.call_operation(...)` works immediately.
 """
 
-from dale import primitives  # noqa: F401  (import side effect: registers builtins)
+from dale import operations  # noqa: F401  (import side effect: registers builtins)
 from dale.catalog import (
     ConfirmableParams,
-    PrimitiveOutput,
-    PrimitiveSpec,
-    get_primitive,
-    list_primitives,
-    primitive,
-    register_primitive,
+    OperationOutput,
+    OperationSpec,
+    get_operation,
+    list_operations,
+    operation,
+    register_operation,
 )
 from dale.cost import CostEstimate
-from dale.dispatch import call_primitive
+from dale.dispatch import call_operation
 from dale.errors import (
     DaleError,
     DivisionByZeroError,
@@ -35,7 +35,7 @@ from dale.errors import (
     InternalError,
     InvalidParamsError,
     LoadError,
-    PrimitiveNotFoundError,
+    OperationNotFoundError,
     RegistryLimitError,
     ToolCallLimitError,
     TypeMismatchError,
@@ -60,20 +60,20 @@ from dale.grammar import (
     resolve_priority,
     resolve_value_ref,
 )
-from dale.registry import DataRegistry, HandleMeta, RegistryLimits
+from dale.registry import DataHandle, DataRegistry, RegistryLimits
 
 __all__ = [
     "DataRegistry",
-    "HandleMeta",
+    "DataHandle",
     "RegistryLimits",
     "FileRegistry",
-    "call_primitive",
-    "register_primitive",
-    "primitive",
-    "get_primitive",
-    "list_primitives",
-    "PrimitiveOutput",
-    "PrimitiveSpec",
+    "call_operation",
+    "register_operation",
+    "operation",
+    "get_operation",
+    "list_operations",
+    "OperationOutput",
+    "OperationSpec",
     "ConfirmableParams",
     "CostEstimate",
     # grammar
@@ -108,7 +108,7 @@ __all__ = [
     "LoadError",
     "ExportError",
     "InvalidParamsError",
-    "PrimitiveNotFoundError",
+    "OperationNotFoundError",
     "InternalError",
     "GraphCycleError",
     "FileNotRegisteredError",

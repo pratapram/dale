@@ -22,9 +22,9 @@ from dale.errors import (
 )
 from dale.files import FileRegistry
 
-HandleKind = Literal["list", "dict", "set"]
-ValueShape = Literal["scalar", "list"]
-ValueType = Literal["record", "scalar"]
+HandleType = Literal["list", "dict", "set"]
+ValueShape = Literal["one", "many"]
+ElementType = Literal["record", "value"]
 
 _SAMPLE_SIZE = 50
 
@@ -38,10 +38,10 @@ class RegistryLimits(BaseModel):
     max_tool_calls: int | None = None
 
 
-class HandleMeta(BaseModel):
+class DataHandle(BaseModel):
     """Metadata surfaced to the LLM — never the underlying data itself. Also what cost estimation (cost.py) reads from.
 
-    `handle` is the single identifier — there is no separate internal id.
+    `name` is the single identifier — there is no separate internal id.
     It's supplied by the caller at create() time (an LLM tool call or an
     invoker's own registry.create()), must read like a Python variable name,
     and is rejected outright on collision with an already-alive handle,
@@ -51,51 +51,51 @@ class HandleMeta(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    handle: str
-    kind: HandleKind
+    name: str
+    type: HandleType
     size: int
     description: str
     value_shape: ValueShape | None = None
-    value_type: ValueType | None = None
+    element_type: ElementType | None = None
     """For a dict handle, whether its values are whole records or bare
-    single values — `"record"` for index_by/group_by, `"scalar"` for
+    single values — `"record"` for index_by/group_by, `"value"` for
     priority_reduce. Deliberately separate from `value_shape`, which states
     *arity* (one value per key vs a list of them) and nothing about type:
-    index_by and priority_reduce both declare value_shape="scalar" while
+    index_by and priority_reduce both declare value_shape="one" while
     holding completely different things, and join_lookup once read that
     field as if it implied "record", crashing on a priority_reduce index
     (an `INTERNAL_ERROR` always means a missing precondition).
 
     Inferred by create() from the same sample it already takes for
-    avg_record_bytes, rather than passed in by each producing primitive —
+    avg_record_bytes, rather than passed in by each producing operation —
     an author who forgets to pass it is exactly the failure mode this field
     exists to prevent. `None` when unknowable (an empty handle, or a
-    non-dict kind)."""
+    non-dict type)."""
     key_arity: int | None = None
     avg_record_bytes: int | None = None
     created_by: str
     source_handles: tuple[str, ...] = ()
 
 
-def _infer_value_type(kind: HandleKind, sample: list[Any]) -> ValueType | None:
-    """Classify a dict handle's values as whole records or bare scalars, from
+def _infer_element_type(type: HandleType, sample: list[Any]) -> ElementType | None:
+    """Classify a dict handle's values as whole records or bare single values, from
     the same sample create() already collects. Only meaningful for dicts —
     a list handle's elements and a set's members aren't "values keyed by
     something", so this returns None for them.
 
     Inferred rather than declared on purpose: making each producing
-    primitive pass its own value_type would put the burden on exactly the
+    operation pass its own element_type would put the burden on exactly the
     author most likely to forget, which is how join_lookup came to assume
     every index held records. Mixed samples (some records, some not) fall
     back to None — "unknown", which consumers must handle defensively —
     rather than guessing from the majority."""
-    if kind != "dict" or not sample:
+    if type != "dict" or not sample:
         return None
     head = sample[:_SAMPLE_SIZE]
     if all(isinstance(v, dict) for v in head):
         return "record"
     if not any(isinstance(v, dict) for v in head):
-        return "scalar"
+        return "value"
     return None
 
 
@@ -125,7 +125,7 @@ class DataRegistry:
         self._files = files
         self._privacy_mode = privacy_mode
         self._storage: dict[str, Any] = {}
-        self._meta: dict[str, HandleMeta] = {}
+        self._meta: dict[str, DataHandle] = {}
         self._call_count = 0
 
     @property
@@ -140,14 +140,14 @@ class DataRegistry:
     def privacy_mode(self) -> bool:
         """Opt-in strict-privacy flag (default off,
         DESIGN.md's Optional Strict-Privacy Mode). When True, `peek`/
-        `describe` redact real values (see src/dale/primitives/inspect.py)
-        and `dispatch.call_primitive` sanitizes validation-error messages —
+        `describe` redact real values (see src/dale/operations/inspect.py)
+        and `dispatch.call_operation` sanitizes validation-error messages —
         the session-wide switch every privacy-sensitive read path checks."""
         return self._privacy_mode
 
     def create(
         self,
-        kind: HandleKind,
+        type: HandleType,
         value: Any,
         *,
         name: str,
@@ -156,10 +156,10 @@ class DataRegistry:
         source_handles: tuple[str, ...] | list[str] = (),
         value_shape: ValueShape | None = None,
         key_arity: int | None = None,
-    ) -> HandleMeta:
+    ) -> DataHandle:
         """Register a new native collection under caller-supplied `name`,
         which becomes the handle itself — no separate internal id. Transform
-        primitives always create a *new* handle rather than mutating a
+        operations always create a *new* handle rather than mutating a
         source in place — this is what makes release_handle meaningful."""
         if not name.isidentifier() or keyword.iskeyword(name):
             raise InvalidParamsError(
@@ -177,14 +177,13 @@ class DataRegistry:
                 details={"limit": self._limits.max_handles},
             )
 
-        handle = name
         size = len(value)
 
-        if kind == "list":
+        if type == "list":
             sample: list[Any] = value
-        elif kind == "dict":
+        elif type == "dict":
             values = list(islice(value.values(), _SAMPLE_SIZE))
-            if value_shape == "list":
+            if value_shape == "many":
                 # group_by-style: each value is itself a list of records —
                 # sample flattened records, not the buckets themselves.
                 sample = []
@@ -195,20 +194,20 @@ class DataRegistry:
         else:  # set
             sample = list(islice(value, _SAMPLE_SIZE))
 
-        meta = HandleMeta(
-            handle=handle,
-            kind=kind,
+        meta = DataHandle(
+            name=name,
+            type=type,
             size=size,
             description=description,
             value_shape=value_shape,
-            value_type=_infer_value_type(kind, sample),
+            element_type=_infer_element_type(type, sample),
             key_arity=key_arity,
             avg_record_bytes=_estimate_avg_bytes(sample),
             created_by=created_by,
             source_handles=tuple(source_handles),
         )
-        self._storage[handle] = value
-        self._meta[handle] = meta
+        self._storage[name] = value
+        self._meta[name] = meta
         return meta
 
     def get(self, handle: str) -> Any:
@@ -216,7 +215,7 @@ class DataRegistry:
             raise HandleNotFoundError(f"no such handle: {handle!r}", details={"handle": handle})
         return self._storage[handle]
 
-    def meta(self, handle: str) -> HandleMeta:
+    def meta(self, handle: str) -> DataHandle:
         if handle not in self._meta:
             raise HandleNotFoundError(f"no such handle: {handle!r}", details={"handle": handle})
         return self._meta[handle]
@@ -230,10 +229,10 @@ class DataRegistry:
     def handle_count(self) -> int:
         return len(self._storage)
 
-    def list_handles(self) -> list[HandleMeta]:
+    def list_handles(self) -> list[DataHandle]:
         """All current handles' metadata — never the underlying data. Used to
         summarize registry state (e.g. for an initial system-prompt context),
-        not exposed as an LLM-facing primitive in this increment."""
+        not exposed as an LLM-facing operation in this increment."""
         return list(self._meta.values())
 
     def record_call(self) -> None:
@@ -250,6 +249,6 @@ class DataRegistry:
 
     def materialize(self, handle: str) -> Any:
         """Test/dev-only full-value accessor. NOT part of the LLM-facing
-        primitive surface — bypasses peek/describe output caps. Used only to
+        operation surface — bypasses peek/describe output caps. Used only to
         assert ground truth in tests."""
         return self.get(handle)

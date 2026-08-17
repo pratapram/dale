@@ -4,7 +4,7 @@ names to real local filesystem paths.
 `load_csv`'s `path: str` parameter used to accept an LLM-constructed string
 directly — Path(path) would open whatever it was given, bounded only by the
 OS-level file permissions of the running process. That's an open-ended local
-file *read* primitive with no restriction, structurally the same shape of
+file *read* operation with no restriction, structurally the same shape of
 problem the grammar already rules out for code ("a condition as a string
 is eval() with extra steps"), just pointed at the filesystem instead.
 

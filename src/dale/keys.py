@@ -1,4 +1,4 @@
-"""Composite-key construction shared by index_by/group_by and join_lookup, plus the shape checks a primitive owes any handle it did not create
+"""Composite-key construction shared by index_by/group_by and join_lookup, plus the shape checks an operation owes any handle it did not create
 itself (an `INTERNAL_ERROR` always means a missing precondition)."""
 
 from __future__ import annotations
@@ -12,41 +12,41 @@ if TYPE_CHECKING:  # import cycle: registry imports errors, not keys
 
 
 def require_dict_handle(
-    registry: DataRegistry, handle: str, *, param: str, primitive: str
+    registry: DataRegistry, handle: str, *, param: str, operation: str
 ) -> Any:
     """Reject a non-dict handle where a keyed lookup is required, naming the
     parameter the caller actually passed rather than a generic 'wrong type'."""
     meta = registry.meta(handle)
-    if meta.kind != "dict":
+    if meta.type != "dict":
         raise TypeMismatchError(
-            f"{primitive} {param} must be a dict handle (built via index_by/group_by/"
-            f"priority_reduce), got {meta.kind!r}",
-            details={"handle": handle, "param": param, "kind": meta.kind},
+            f"{operation} {param} must be a dict handle (built via index_by/group_by/"
+            f"priority_reduce), got {meta.type!r}",
+            details={"handle": handle, "param": param, "type": meta.type},
         )
     return meta
 
 
 def require_record_valued(
-    registry: DataRegistry, handle: str, *, param: str, primitive: str
+    registry: DataRegistry, handle: str, *, param: str, operation: str
 ) -> Any:
-    """Reject a dict handle whose values are bare scalars where the caller
+    """Reject a dict handle whose values are bare single values where the caller
     needs to read fields off them.
 
     The check `require_dict_handle` alone does not cover: `index_by` and
-    `priority_reduce` both produce dicts with value_shape="scalar", but the
+    `priority_reduce` both produce dicts with value_shape="one", but the
     former's values are records and the latter's are single field values.
     Reading a field off the latter used to raise a bare Python TypeError
     inside join_lookup, which dispatch sanitized into an unactionable
     INTERNAL_ERROR. Call this whenever you intend to subscript a dict
     handle's values."""
-    meta = require_dict_handle(registry, handle, param=param, primitive=primitive)
-    if meta.value_type == "scalar":
+    meta = require_dict_handle(registry, handle, param=param, operation=operation)
+    if meta.element_type == "value":
         raise TypeMismatchError(
-            f"{primitive} {param} {handle!r} holds single values, not records — "
+            f"{operation} {param} {handle!r} holds single values, not records — "
             "its values came from something like priority_reduce, so there are no "
             "fields to read off them. Use an index built by index_by or group_by, "
             "or name exactly one target field to bind the value to.",
-            details={"handle": handle, "param": param, "value_type": meta.value_type},
+            details={"handle": handle, "param": param, "element_type": meta.element_type},
         )
     return meta
 

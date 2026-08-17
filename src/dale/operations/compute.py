@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dale.catalog import PrimitiveOutput, primitive
+from dale.catalog import OperationOutput, operation
 from dale.errors import TypeMismatchError
 from dale.grammar import ComputedField, ValueRef, apply_computed_field
 from dale.registry import DataRegistry
@@ -22,16 +22,16 @@ class ComputeFieldParams(BaseModel):
     description: str
 
 
-@primitive("compute_field", ComputeFieldParams, bounded_by_input=True, creates_handle=True)
-def compute_field(registry: DataRegistry, params: ComputeFieldParams) -> PrimitiveOutput:
+@operation("compute_field", ComputeFieldParams, bounded_by_input=True, creates_handle=True)
+def compute_field(registry: DataRegistry, params: ComputeFieldParams) -> OperationOutput:
     """Add a derived field to every record in a list handle, computed from
     two operands (each a field reference or a constant) and an arithmetic
     operator. Returns a new list handle with the extra field added."""
     meta = registry.meta(params.handle)
-    if meta.kind != "list":
+    if meta.type != "list":
         raise TypeMismatchError(
-            f"compute_field requires a list handle, got {meta.kind!r}",
-            details={"handle": params.handle, "kind": meta.kind},
+            f"compute_field requires a list handle, got {meta.type!r}",
+            details={"handle": params.handle, "type": meta.type},
         )
 
     source = registry.get(params.handle)
@@ -53,4 +53,4 @@ def compute_field(registry: DataRegistry, params: ComputeFieldParams) -> Primiti
         created_by="compute_field",
         source_handles=[params.handle],
     )
-    return PrimitiveOutput(status="ok", handle=new_meta)
+    return OperationOutput(status="ok", handle=new_meta)

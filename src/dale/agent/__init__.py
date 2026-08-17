@@ -9,17 +9,17 @@ correctness signal (intent -> tool call -> result), not just a final-answer
 pass/fail.
 
 The model is offered exactly one tool, `run_plan`, whose `steps` are a
-discriminated union over the primitive catalog. A single primitive call is a
+discriminated union over the operation catalog. A single operation call is a
 `steps` list of length one — not a special case, the trivial case — so the
 model never chooses between two encodings of the same call and the catalog is
 published once per request rather than twice.
 
-Every step injects one extra required field, `intent`, onto the primitive's
+Every step injects one extra required field, `intent`, onto the operation's
 own param schema — a short natural-language note on *why* the model is making
 this specific call. `intent` is stripped before the call reaches
-`dale.call_primitive` (primitives themselves don't know about it) and is
+`dale.call_operation` (operations themselves don't know about it) and is
 recorded, alongside the call and its result, as an ActionLogEntry.
-Handle-creating primitives also declare `name`/`description` directly on
+Handle-creating operations also declare `name`/`description` directly on
 their own param schema (not injected here) — `name` becomes the handle's
 real identifier in DataRegistry itself, so it must reach dispatch, not just
 the log.
@@ -89,7 +89,7 @@ from dale.agent.tools import (
     _build_run_plan_tool,
     _call_params,
     _params_for_plan_step,
-    _selected_primitives,
+    _selected_operations,
     _UntitledToolJsonSchema,
     build_tools,
 )
@@ -156,7 +156,7 @@ def build_agent(
     repetition_nudge: bool = True,
     repetition_limit: int | None = _REPETITION_LIMIT_DEFAULT,
     max_steps_per_call: int | None = None,
-    primitives: Sequence[str] | None = None,
+    operations: Sequence[str] | None = None,
     model_settings: dict[str, Any] | None = None,
 ) -> Agent:
     """`peek_at_every_step` (default True) is ignored entirely — no initial
@@ -167,7 +167,7 @@ def build_agent(
     is used verbatim.
 
     `repetition_nudge`, `repetition_limit`, `max_steps_per_call` and
-    `primitives` are passed straight to build_tools — see there, and
+    `operations` are passed straight to build_tools — see there, and
     _execute_and_log_step for what the first two actually do at the choke point
     they act on. `repetition_limit` is validated here as well as there, both
     because it reads as a parameter of *this* function to anyone calling it and
@@ -197,7 +197,7 @@ def build_agent(
         `peak_context_tokens`, so paper.md Section 4.2 part (C)'s
         bounded-context claim stays honest under it."""
     # Every configuration check runs before pick_model(), never after: a bad
-    # `primitives` name or `max_steps_per_call` is the invoker's mistake, and
+    # `operations` name or `max_steps_per_call` is the invoker's mistake, and
     # surfacing it as "No API key found" — which is what happens if build_tools
     # is left to run inside the Agent(...) call below — sends whoever hit it
     # looking for credentials they don't need. Same reason
@@ -213,7 +213,7 @@ def build_agent(
         repetition_limit=repetition_limit,
         privacy_mode=registry.privacy_mode,
         max_steps_per_call=max_steps_per_call,
-        primitives=primitives,
+        operations=operations,
     )
     resolved_model = model or pick_model()
 

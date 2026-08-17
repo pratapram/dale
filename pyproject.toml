@@ -1,7 +1,7 @@
 [project]
 name = "dale-engine"
-version = "0.1.1"
-description = "Declarative Algorithmic Logic Engine — non-Turing-complete tool primitives for LLM-orchestrated data processing"
+version = "0.2.0"
+description = "Declarative Algorithmic Logic Engine — non-Turing-complete operations for LLM-orchestrated data processing"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICEN[CS]E*"]

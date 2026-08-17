@@ -10,8 +10,8 @@ issues in this snapshot has any labels; the rest have "labels": [] and
 correctly contribute zero rows to the result — no separate filter step
 needed.
 
-Like examples/05-07, this calls primitives directly (no LLM, no API key
-needed) — the "LLM" in a real deployment would choose these same primitive
+Like examples/05-07, this calls operations directly (no LLM, no API key
+needed) — the "LLM" in a real deployment would choose these same operation
 names and structured arguments; here we call them directly to keep the
 example self-contained and runnable everywhere. examples/04_llm_orchestrated.py
 shows the same kind of pipeline chosen by a real model instead.
@@ -30,7 +30,7 @@ files.register("pandas_issues.json", DATA_FILE)
 registry = dale.DataRegistry(files=files)
 
 # load_json: a top-level JSON array becomes a list handle, same as load_csv.
-loaded = dale.call_primitive(
+loaded = dale.call_operation(
     registry,
     "load_json",
     {
@@ -45,11 +45,11 @@ print(f"loaded: {loaded.handle.size} issues")
 # row, carrying "number"/"title" down from the parent issue onto each one.
 # An issue with an empty "labels" array contributes zero rows — nothing
 # extra to do for that.
-flattened = dale.call_primitive(
+flattened = dale.call_operation(
     registry,
     "flatten_json",
     {
-        "handle": loaded.handle.handle,
+        "handle": loaded.handle.name,
         "path": ["labels"],
         "carry_fields": ["number", "title"],
         "name": "issue_labels",
@@ -59,10 +59,10 @@ flattened = dale.call_primitive(
 print(f"flattened: {flattened.handle.size} label rows (from {loaded.handle.size} issues)\n")
 
 print("Result (one row per label):")
-for row in registry.materialize(flattened.handle.handle):
+for row in registry.materialize(flattened.handle.name):
     print(f"  #{row['number']}  {row['name']:<8} {row['title'][:60]}")
 
 # release_handle: explicit cleanup once a handle is no longer needed.
-for h in (loaded.handle.handle, flattened.handle.handle):
-    dale.call_primitive(registry, "release_handle", {"handle": h})
+for h in (loaded.handle.name, flattened.handle.name):
+    dale.call_operation(registry, "release_handle", {"handle": h})
 print(f"\nhandles remaining after cleanup: {registry.handle_count()}")
