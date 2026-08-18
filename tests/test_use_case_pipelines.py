@@ -298,7 +298,7 @@ def test_use_case_6_license_reconciliation(registry):
     invoker in plain Python before DALE ever sees them (no union/concat
     operation exists yet — same "assembly is the invoker's job" precedent
     DALE already applies to paginated API responses); DALE's own
-    job starts at priority_reduce."""
+    job starts at reduce_by."""
     base = DATA_DIR / "license_reconciliation"
 
     candidates = []
@@ -311,12 +311,12 @@ def test_use_case_6_license_reconciliation(registry):
 
     resolved = dale.call_operation(
         registry,
-        "priority_reduce",
+        "reduce_by",
         {
             "handle": candidates_meta.name,
             "key_fields": ["email"],
             "value_field": "tier",
-            "priority": ["gold", "silver", "bronze"],
+            "order_by": [{"field": "tier", "ranking": ["gold", "silver", "bronze"]}],
             "name": "resolved",
             "description": "d",
         },

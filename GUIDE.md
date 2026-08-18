@@ -338,7 +338,7 @@ returns `status="cost_gate_exceeded"` with its `.estimate` and no handle at all.
 | `sort_by` | list → list | Stable multi-key sort, nulls sorted last |
 | `index_by` | list → dict | Build a unique-keyed `dict` (composite key → single record); errors on duplicates |
 | `group_by` | list → dict | Build a bucketed `dict` (composite key → list of records) |
-| `priority_reduce` | list → dict | `index_by`, but for duplicate keys instead of erroring: resolves each group's `value_field` to a single winning value via a priority order (e.g. license tiers, "gold" beats "silver" beats "bronze") — the "Hash map + priority-ordered reduction" pattern |
+| `reduce_by` | list → dict | `index_by`, but for duplicate keys instead of erroring: keeps one record per key — the first under `order_by`. Order by a field (`{field, order}`: highest score, latest timestamp) or by an explicit `ranking` of values (`["gold","silver","bronze"]`); unranked and missing values sort last. Returns whole records, or just one field's value with `value_field`. The "group + argmax" pattern (SQL's `ROW_NUMBER() … = 1`) |
 | `dict_diff` | dict + dict → list | Compare two `dict` handles keyed the same way; returns one row per key across their union, each tagged `new`/`removed`/`changed`/`unchanged` |
 | `join_lookup` | list + dict → list | Merge a `list` against an `index_by`/`group_by`-built `dict`; real fan-out risk, and a real cost estimator |
 | `window_flag` | list → list | Sliding-window occurrence counting/flagging over a group key + orderable field (numeric or ISO 8601) — the "Sliding Window / Two-Pointer" pattern (log-stream sessionization) |
@@ -369,7 +369,7 @@ for field in schema["properties"]:
 ```
 
 ```
-['compute_field', 'describe', 'dict_diff', 'export_handle', 'filter_where', 'flatten_json', 'graph_walk_resolve', 'group_by', 'index_by', 'join_lookup', 'load_csv', 'load_json', 'peek', 'priority_reduce', 'release_handle', 'sort_by', 'window_flag']
+['compute_field', 'describe', 'dict_diff', 'export_handle', 'filter_where', 'flatten_json', 'graph_walk_resolve', 'group_by', 'index_by', 'join_lookup', 'load_csv', 'load_json', 'peek', 'reduce_by', 'release_handle', 'sort_by', 'window_flag']
 Flag records with >= threshold qualifying occurrences (matching an
 optional predicate) within a trailing window over an orderable field,
 grouped by one or more key fields. Returns a new list handle with two
@@ -414,7 +414,7 @@ for JSON, `flatten_json`'s multi-level `path` support, `load_jsonl`/`load_parque
 | `06_composite_key_join.py` | Two suppliers list overlapping SKUs, so a product is only identified by supplier *and* SKU together. Orders have to be priced against that pair. | No LLM required. `index_by`/`group_by` with multi-field (composite/tuple) keys, then `join_lookup` |
 | `07_cost_estimation_guardrail.py` | 10 records join against 10 tags that all share one key — 100 rows out, against a ceiling of 20. | No LLM required. **Start here for the safety story.** The join is refused *before* it runs, with an exact estimate (`estimated_rows: 100 (threshold: 20)`) and no handle created — then succeeds under an explicit `confirm=True` |
 | `08_json_flatten.py` | A real GitHub issues response where each issue carries a nested `labels` array. You want one row per label. | No LLM required. `load_json` + `flatten_json`; issues with no labels contribute zero rows rather than erroring |
-| `09_license_reconciliation.py` | Three per-tier eligibility lists are regenerated hourly. A user can appear on several and must resolve to their highest tier, and you need to know who joined, left, or changed tier since the last run. | `priority_reduce` to collapse each user to one tier (gold beats silver beats bronze), then `dict_diff` against the previous hour |
+| `09_license_reconciliation.py` | Three per-tier eligibility lists are regenerated hourly. A user can appear on several and must resolve to their highest tier, and you need to know who joined, left, or changed tier since the last run. | `reduce_by` to collapse each user to one tier (`ranking: ["gold","silver","bronze"]`), then `dict_diff` against the previous hour |
 | `10_named_handle_referencing.py` | Three datasets registered as `people_list`, `org_list`, and `place_list`, referred to by exactly those names in the task text — no ID for the model to resolve first. | A handle's name *is* its identity; the model chains `index_by` + `join_lookup` twice to attach each Engineering employee's office, then that office's city and capacity |
 
 ```bash
@@ -481,7 +481,7 @@ deliberate way to run them; it needs `ANTHROPIC_API_KEY`.
 
 Tests are per module (`test_registry`, `test_grammar`, `test_errors`, `test_operations_core`,
 `test_operations_phase2`, `test_cost_estimation`, `test_baseline`, `test_dict_diff`, `test_files`,
-`test_flatten_json`, `test_priority_reduce`, `test_harness_usage`, `test_agent`, `test_agent_live`)
+`test_flatten_json`, `test_reduce_by`, `test_harness_usage`, `test_agent`, `test_agent_live`)
 with small isolated fixtures. `test_use_case_pipelines.py` is the deliberate exception: it runs the
 `DESIGN.md` §3 use cases end to end against `examples/data/`, asserting independently-computed
 ground truth. Three of its tests reach `dale.agent` through the eval harness and skip themselves

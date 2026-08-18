@@ -1,5 +1,61 @@
 # Changelog
 
+## Unreleased — breaking
+
+### `priority_reduce` → `reduce_by`
+
+`priority_reduce` fused a general mechanism with a single hardcoded policy. The
+mechanism — keep one record per key, under an ordering — is SQL's
+`ROW_NUMBER() OVER (PARTITION BY key ORDER BY ...) = 1`, or argmax per group.
+Ranking by position in an explicit value list is only *one* way to define that
+ordering, and it was the only one `priority_reduce` could express: "highest
+score wins" and "latest timestamp wins" were both unreachable, despite being
+more common than the ranked-enum case it was built for.
+
+`reduce_by` keeps the mechanism and makes the policy a parameter. No
+back-compat shim, per the 0.2.0 precedent — `priority_reduce` is gone.
+
+```python
+# before
+call_operation(registry, "priority_reduce", {
+    "handle": "candidates", "key_fields": ["email"],
+    "value_field": "tier", "priority": ["gold", "silver", "bronze"],
+    "name": "resolved", "description": "...",
+})
+
+# after
+call_operation(registry, "reduce_by", {
+    "handle": "candidates", "key_fields": ["email"],
+    "value_field": "tier",
+    "order_by": [{"field": "tier", "ranking": ["gold", "silver", "bronze"]}],
+    "name": "resolved", "description": "...",
+})
+```
+
+Three behaviour changes beyond the rename:
+
+- **`order_by` replaces `priority`**, and takes a list of keys, most
+  significant first. Each key is `{field, order: asc|desc}` — order by the
+  field's own values — or `{field, ranking: [...]}` for an explicit
+  highest-to-lowest list of values. `sort_by`'s `SortKey` is deliberately *not*
+  reused: `ranking` is meaningless for a whole-list sort, and `run_plan`'s
+  schema rides on every request, so a field added to a shared type is paid for
+  by every operation that uses it.
+- **An unranked value no longer aborts the call.** Values not in `ranking` —
+  and missing or `None` values — now rank below every listed one, the same
+  NULLS-LAST rule `sort_by` already applies. A group whose only value is
+  unranked wins by default. Previously this raised
+  `TYPE_MISMATCH: none of [...] found in priority order [...]`, which was
+  observed in live trials as a recoverable but avoidable wasted turn.
+- **`value_field` is now optional.** Omit it and the whole winning record is
+  kept (`key -> record`, like `index_by`); name it and only that field's value
+  is kept (`key -> value`, the old behaviour, which is what `dict_diff`
+  against a single-valued dict needs).
+
+`key_fields`, `order_by` and `ranking` are all `min_length=1`. An empty
+ordering cannot resolve anything for any input, so it is now rejected by schema
+validation before execution rather than surfacing per key at runtime.
+
 ## 0.2.0 — breaking
 
 A vocabulary rename, with **no back-compat shims**. Every name below changed at

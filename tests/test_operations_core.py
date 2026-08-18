@@ -642,22 +642,22 @@ def test_join_lookup_wrong_index_type_raises(registry):
 # --- join_lookup against a scalar-valued index ---------------------------
 #
 # Regression set for the bug where join_lookup assumed every index value was
-# a record. A priority_reduce index holds bare values, so `if f in matched`
+# a record. A value_field reduce_by index holds bare values, so `if f in matched`
 # raised TypeError, which dispatch sanitized into an unactionable
 # INTERNAL_ERROR -- an INTERNAL_ERROR always means a missing precondition.
 
 
 def _usage_marker_index(registry, present_keys, name_suffix="idx"):
-    """The exact shape priority_reduce produces: one bare value per key."""
+    """The exact shape reduce_by with a value_field produces: one bare value per key."""
     events = _load_records(registry, [{"account_id": k, "mark": 1} for k in present_keys])
     out = call_operation(
         registry,
-        "priority_reduce",
+        "reduce_by",
         {
             "handle": events.name,
             "key_fields": ["account_id"],
             "value_field": "mark",
-            "priority": [1],
+            "order_by": [{"field": "mark", "ranking": [1]}],
             "name": f"usage_{name_suffix}",
             "description": "one marker per account",
         },
@@ -687,13 +687,13 @@ def test_every_dict_producer_declares_the_split_shape_vocabulary(registry):
     Before the rename both fields could read `"scalar"` and it meant two
     unrelated things — arity on `value_shape`, value-not-record on
     `element_type`. Reading one as if it were the other is what made
-    join_lookup crash on a priority_reduce index. The vocabularies are now
+    join_lookup crash on a value-valued index. The vocabularies are now
     disjoint, and the only way to keep them disjoint is to assert the full
     3x2 grid in one place: a producer that regressed to the other field's
     literal fails here rather than several layers downstream inside a
     consumer.
 
-    index_by and priority_reduce are the pair that matters — identical
+    index_by and reduce_by(value_field=...) are the pair that matters — identical
     `value_shape`, different `element_type`. group_by is the only `"many"`.
     """
     records = _load_records(
@@ -712,12 +712,12 @@ def test_every_dict_producer_declares_the_split_shape_vocabulary(registry):
     ).handle
     reduced = call_operation(
         registry,
-        "priority_reduce",
+        "reduce_by",
         {
             "handle": records.name,
             "key_fields": ["account_id"],
             "value_field": "mark",
-            "priority": [1],
+            "order_by": [{"field": "mark", "ranking": [1]}],
             "name": "pr",
             "description": "d",
         },
@@ -743,10 +743,10 @@ def test_join_lookup_reads_each_shape_field_for_its_own_purpose(registry):
     join_lookup reads `value_shape` to decide whether a matched entry is one
     thing or a bucket to fan out over, and `element_type` to decide whether
     that thing has fields to read or is a bare value to bind. Those are two
-    independent decisions, and index_by vs priority_reduce differ only in the
+    independent decisions, and index_by vs reduce_by differ only in the
     second — so a join that consulted the wrong field would still produce
     plausible output for index_by and group_by and fail only on
-    priority_reduce, which is precisely how the original bug hid. One base
+    reduce_by, which is precisely how the original bug hid. One base
     record, three joins, three distinguishable results."""
     base = _load_records(registry, [{"account_id": "A"}])
     dupes = _load_records(
@@ -800,12 +800,12 @@ def test_join_lookup_reads_each_shape_field_for_its_own_purpose(registry):
     # single `fields` name instead of having fields read off it.
     reduced = call_operation(
         registry,
-        "priority_reduce",
+        "reduce_by",
         {
             "handle": dupes.name,
             "key_fields": ["account_id"],
             "value_field": "tier",
-            "priority": ["gold", "silver"],
+            "order_by": [{"field": "mark", "ranking": ["gold", "silver"]}],
             "name": "pr2",
             "description": "d",
         },
@@ -873,10 +873,15 @@ def _dict_producers(registry):
     yield "group_by", call_operation(
         registry, "group_by", {**common, "name": "p_group"}
     ).handle
-    yield "priority_reduce", call_operation(
+    yield "reduce_by", call_operation(
         registry,
-        "priority_reduce",
-        {**common, "value_field": "v", "priority": [1, 2, 3], "name": "p_reduce"},
+        "reduce_by",
+        {
+            **common,
+            "value_field": "v",
+            "order_by": [{"field": "v", "ranking": [1, 2, 3]}],
+            "name": "p_reduce",
+        },
     ).handle
     unique = _load_records(registry, [{"k": "A", "v": 1}, {"k": "B", "v": 3}])
     yield "index_by", call_operation(
@@ -1102,8 +1107,8 @@ def test_peek_on_an_index_by_dict_keeps_one_record_per_key(registry):
     assert "truncated" not in out.result
 
 
-def test_peek_on_a_priority_reduce_dict_is_unchanged(registry):
-    """priority_reduce values are bare scalars — they must stay bare scalars,
+def test_peek_on_a_value_valued_dict_is_unchanged(registry):
+    """reduce_by values are bare scalars — they must stay bare scalars,
     not be wrapped in a list or a truncation envelope."""
     source = _load_records(
         registry,
@@ -1111,12 +1116,12 @@ def test_peek_on_a_priority_reduce_dict_is_unchanged(registry):
     )
     call_operation(
         registry,
-        "priority_reduce",
+        "reduce_by",
         {
             "handle": source.name,
             "key_fields": ["k"],
             "value_field": "s",
-            "priority": ["gold", "silver"],
+            "order_by": [{"field": "mark", "ranking": ["gold", "silver"]}],
             "name": "best_dict",
             "description": "d",
         },
@@ -1218,7 +1223,7 @@ def _adversarial_handles(registry):
     )
     registry.create(
         "dict", {f"k{i}": "v" * 20_000 for i in range(40)},
-        name="scalar_dict", description="priority_reduce-shaped, huge scalars",
+        name="scalar_dict", description="reduce_by-shaped, huge scalars",
         created_by="fixture",
     )
     registry.create(
@@ -1372,7 +1377,7 @@ _BUILTIN_OPERATIONS = frozenset(
         "load_csv",
         "load_json",
         "peek",
-        "priority_reduce",
+        "reduce_by",
         "release_handle",
         "sort_by",
         "window_flag",

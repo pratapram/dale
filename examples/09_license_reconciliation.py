@@ -12,7 +12,7 @@ plain Python, before DALE ever sees the data — no union/concat operation
 exists in the catalog yet, and this kind of mechanical assembly isn't an
 interesting decision for the model to make anyway (DALE already
 treats assembling paginated API responses into one document the same way:
-the invoker's job, not the LLM's). The model's job starts at priority_reduce:
+the invoker's job, not the LLM's). The model's job starts at reduce_by:
 resolving the tagged candidates to one tier per user, then dict_diff against
 previous_assignments.
 

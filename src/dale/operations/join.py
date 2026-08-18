@@ -46,7 +46,7 @@ def _validate_join_handles(registry: DataRegistry, params: JoinLookupParams) -> 
             f"got {index_meta.type!r}",
             details={"handle": params.index_handle, "type": index_meta.type},
         )
-    # A scalar-valued index (priority_reduce) has no fields to read off its
+    # A scalar-valued index (reduce_by with a value_field) has no fields to read off its
     # values, so the caller must say what to call the value it's merging in.
     # Checked here rather than mid-loop so the model learns before any work
     # happens, and so the cost estimator rejects it on the same terms.
@@ -57,7 +57,7 @@ def _validate_join_handles(registry: DataRegistry, params: JoinLookupParams) -> 
             f"join_lookup index_handle {params.index_handle!r} holds single values, "
             "not records — pass exactly one name in `fields` to bind that value to "
             f"(got {params.fields!r}). An index_by/group_by index can merge several "
-            "fields; a priority_reduce index carries only one value per key.",
+            "fields; a value_field index carries only one value per key.",
             details={
                 "handle": params.index_handle,
                 "element_type": index_meta.element_type,
