@@ -65,7 +65,20 @@ def _explode_record(
     return rows
 
 
-@operation("flatten_json", FlattenJsonParams, creates_handle=True)
+@operation(
+    "flatten_json",
+    FlattenJsonParams,
+    io_signature="list → list",
+    summary=(
+        'Explode a nested array field into one row per element, carrying '
+        "selected parent fields down onto each row (e.g. a GitHub issue's "
+        '`labels` array → one row per label, with the issue number/title '
+        'attached). A record whose target field is absent, `null`, or an '
+        'empty array contributes zero rows — not an error. `path` supports '
+        'one level of nesting today, not arbitrary depth'
+    ),
+    creates_handle=True,
+)
 def flatten_json(registry: DataRegistry, params: FlattenJsonParams) -> OperationOutput:
     """Explode a nested array field into one row per element, carrying
     selected parent fields down onto each row. A record whose path field is

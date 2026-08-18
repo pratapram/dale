@@ -57,6 +57,23 @@ class OperationSpec(BaseModel):
     operations get the LLM-supplied name/description fields injected,
     without hardcoding an operation-name list at the agent layer — the
     catalog is the single source of truth for what an operation does."""
+    io_signature: str | None = None
+    """Handle types in and out, as prose — "list -> dict", "dict + dict ->
+    list", "any -> sample". Documentation, not a contract: the runtime type
+    checks inside each operation body remain the enforcement, and nothing
+    reads this to decide anything. Optional so a third-party
+    `register_operation` call stays valid without it."""
+    summary: str | None = None
+    """One-line human-facing purpose, for the catalog renderers in
+    `dale.describe` and the generated GUIDE.md table.
+
+    Deliberately not the docstring. `fn.__doc__` is shipped to the model as
+    the operation's tool description on every single request (see
+    `dale.agent.tools._params_for_plan_step`), so prose written for a human
+    reader would be paid for in tokens on every call. This field is never
+    read on the agent path, so it costs nothing there — which is what lets
+    it carry the links, emphasis and asides a reference table wants and a
+    tool description does not. Falls back to the docstring when None."""
 
 
 _CATALOG: dict[str, OperationSpec] = {}
@@ -70,6 +87,8 @@ def register_operation(
     cost_estimator: CostEstimatorFn | None = None,
     bounded_by_input: bool = False,
     creates_handle: bool = False,
+    io_signature: str | None = None,
+    summary: str | None = None,
 ) -> None:
     if name in _CATALOG:
         raise ValueError(f"operation already registered: {name!r}")
@@ -80,6 +99,8 @@ def register_operation(
         cost_estimator=cost_estimator,
         bounded_by_input=bounded_by_input,
         creates_handle=creates_handle,
+        io_signature=io_signature,
+        summary=summary,
     )
 
 
@@ -90,6 +111,8 @@ def operation(
     cost_estimator: CostEstimatorFn | None = None,
     bounded_by_input: bool = False,
     creates_handle: bool = False,
+    io_signature: str | None = None,
+    summary: str | None = None,
 ) -> Callable[[OperationFn], OperationFn]:
     """Decorator sugar over register_operation — identical usage for built-ins
     and for a developer's own `register_operation` calls.
@@ -111,6 +134,8 @@ def operation(
             cost_estimator=cost_estimator,
             bounded_by_input=bounded_by_input,
             creates_handle=creates_handle,
+            io_signature=io_signature,
+            summary=summary,
         )
         return fn
 

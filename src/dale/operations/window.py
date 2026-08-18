@@ -76,7 +76,18 @@ def _window_delta(sample_value: Any, window_size: float) -> Any:
     return timedelta(seconds=window_size) if isinstance(sample_value, datetime) else window_size
 
 
-@operation("window_flag", WindowFlagParams, bounded_by_input=True, creates_handle=True)
+@operation(
+    "window_flag",
+    WindowFlagParams,
+    io_signature="list → list",
+    summary=(
+        'Sliding-window occurrence counting/flagging over a group key + '
+        'orderable field (numeric or ISO 8601) — the "Sliding Window / '
+        'Two-Pointer" pattern (log-stream sessionization)'
+    ),
+    bounded_by_input=True,
+    creates_handle=True,
+)
 def window_flag(registry: DataRegistry, params: WindowFlagParams) -> OperationOutput:
     """Flag records with >= threshold qualifying occurrences (matching an
     optional predicate) within a trailing window over an orderable field,

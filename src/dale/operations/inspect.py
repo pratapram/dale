@@ -306,7 +306,22 @@ def _sample_dict(
     return sample, truncated
 
 
-@operation("peek", PeekParams)
+@operation(
+    "peek",
+    PeekParams,
+    io_signature="any → sample",
+    summary=(
+        'A small sample of a handle — a sanity check, not a data-dump '
+        'channel. Hard-capped at 50 items **and 4 KB serialized**, whatever '
+        'the handle holds and however deeply it nests, so a `peek` of a '
+        '10-million-row handle costs the same as one of a 10-row handle. '
+        'Anything cut to fit says so in place: a shortened list ends with '
+        '`"+N more items"`, a shortened dict gains a `"..."` entry counting '
+        'the keys not shown, a shortened string ends with `"...(+N more '
+        'chars)"`, and `"truncated": true` sits alongside the sample — a '
+        'sample never understates what is there'
+    ),
+)
 def peek(registry: DataRegistry, params: PeekParams) -> OperationOutput:
     """Return a small sample of a handle — a sanity check on shape and fields,
     never a way to read the data. The sample is capped at 50 items and, hard,
@@ -383,7 +398,17 @@ def _records_from_handle(registry: DataRegistry, handle: str) -> list[Any]:
     return [{"value": v} for v in value]  # set
 
 
-@operation("describe", DescribeParams)
+@operation(
+    "describe",
+    DescribeParams,
+    io_signature="any → stats",
+    summary=(
+        'Aggregate statistics for a field (numeric min/max/mean/null-rate, or '
+        'categorical distinct-count/top-k) — never individual values dumped '
+        "in bulk. `top_k`'s *values* are subject to the same byte cap and the "
+        'same in-place markers as `peek`; its counts never are'
+    ),
+)
 def describe(registry: DataRegistry, params: DescribeParams) -> OperationOutput:
     """Aggregate statistics for a field: min/max/mean/null-rate for numeric
     fields, distinct-count/top-k for categorical ones. With no field given,

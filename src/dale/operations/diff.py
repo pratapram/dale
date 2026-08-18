@@ -30,7 +30,18 @@ def _status(key: Any, current: dict, previous: dict) -> str:
     return "changed" if current[key] != previous[key] else "unchanged"
 
 
-@operation("dict_diff", DictDiffParams, bounded_by_input=True, creates_handle=True)
+@operation(
+    "dict_diff",
+    DictDiffParams,
+    io_signature="dict + dict → list",
+    summary=(
+        'Compare two `dict` handles keyed the same way; returns one row per '
+        'key across their union, each tagged '
+        '`new`/`removed`/`changed`/`unchanged`'
+    ),
+    bounded_by_input=True,
+    creates_handle=True,
+)
 def dict_diff(registry: DataRegistry, params: DictDiffParams) -> OperationOutput:
     """Compare two dict handles (any two — reduce_by's output, a plain
     load_json dict, anything keyed the same way) and return a new list

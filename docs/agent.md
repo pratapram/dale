@@ -169,6 +169,27 @@ dispatch-level view of it: it interleaves the raw protocol messages (system/user
 model's exact tool-call args before `intent` is stripped, tool returns, any free text) right before
 each call's usual human-readable block.
 
+`"raw"` also prints the model's **action space** once, before the run starts — the operations this
+agent was built with, in `dale.render_catalog`'s `compact` form:
+
+```
+OPERATIONS AVAILABLE TO THE MODEL (17 of 17)
+
+filter_where  list → list  [new, bounded]
+  Keep records matching a predicate (comparisons, `and`/`or`/`not`)
+  (handle, predicate, name, description)
+...
+```
+
+It reports the **selection, not the catalog**. `build_agent(..., operations=[...])` narrows it and
+`privacy_mode` withholds `peek` entirely, and the header says so — `(3 of 17 — allowlist)`,
+`(16 of 17 — peek withheld under privacy_mode)` — because a preamble claiming the full catalog
+would credit the model with calls it cannot make. This prints from `build_agent`, not `run_agent`,
+so it appears whether you go on to call `run_agent` or `agent.run_sync` directly.
+
+The same rendering is available outside a run, over the whole catalog, as `dale.render_catalog(...)`
+or `python -m dale operations` — see [GUIDE.md](../GUIDE.md#operation-catalog).
+
 Use `run_agent` rather than calling `agent.run_sync(...)` directly to get two things a bare
 `run_sync` structurally can't provide: the trailing raw messages after the run ends (the last tool
 return plus the model's closing output — nothing else triggers after them, so nothing else would

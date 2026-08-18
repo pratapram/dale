@@ -15,7 +15,14 @@ class FilterWhereParams(BaseModel):
     description: str
 
 
-@operation("filter_where", FilterWhereParams, bounded_by_input=True, creates_handle=True)
+@operation(
+    "filter_where",
+    FilterWhereParams,
+    io_signature="list → list",
+    summary="Keep records matching a predicate (comparisons, `and`/`or`/`not`)",
+    bounded_by_input=True,
+    creates_handle=True,
+)
 def filter_where(registry: DataRegistry, params: FilterWhereParams) -> OperationOutput:
     """Keep only the records in a list handle matching a predicate (field
     comparisons combined with and/or/not). Returns a new list handle."""

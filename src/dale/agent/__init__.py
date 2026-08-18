@@ -149,6 +149,41 @@ def pick_model() -> str:
     )
 
 
+def _render_operations_preamble(
+    registry: dale.DataRegistry, operations: Sequence[str] | None
+) -> str:
+    """The model's action space, printed once at verbosity="raw" before the
+    run starts.
+
+    It has to show what this agent was actually offered, not the catalog:
+    `operations` defaults to CORE_OPERATIONS and `privacy_mode` withholds `peek`, so
+    printing everything would credit the model with calls it cannot make. That
+    selection is computed by `_selected_operations`, the same function
+    `build_tools` uses -- called again here rather than copied, since its whole
+    point is being the one place either filter is applied.
+
+    This lives in `build_agent` rather than `run_agent` for two reasons: it is
+    the only function holding all three of `verbosity`, `registry.privacy_mode`
+    and `operations`, and examples 02, 03, 04, 09 and 10 drive `agent.run_sync`
+    directly and never reach `run_agent` at all."""
+    selected = _selected_operations(operations, privacy_mode=registry.privacy_mode)
+    total = len(dale.list_operations())
+
+    why = []
+    if operations is None:
+        # The default narrows too, and silently: printing "9 of 17" with no
+        # reason reads as a bug. Say which of the three modes produced this.
+        why.append("core default; operations=ALL_OPERATIONS for the full catalog")
+    elif operations != ALL_OPERATIONS:
+        why.append("allowlist")
+    if registry.privacy_mode and "peek" not in selected:
+        why.append("peek withheld under privacy_mode")
+    narrowed = f" — {'; '.join(why)}" if why else ""
+
+    header = f"OPERATIONS AVAILABLE TO THE MODEL ({len(selected)} of {total}{narrowed})"
+    return f"{header}\n\n{dale.render_catalog(selected, format='compact')}\n"
+
+
 def build_agent(
     registry: dale.DataRegistry,
     action_log: ActionLog,
@@ -230,6 +265,9 @@ def build_agent(
     defaults: dict[str, Any] = {"parallel_tool_calls": False}
     if isinstance(resolved_model, str) and resolved_model.startswith("anthropic:"):
         defaults["anthropic_cache_tool_definitions"] = True
+
+    if verbosity == "raw":
+        print(_render_operations_preamble(registry, operations), flush=True)
 
     return Agent(
         resolved_model,

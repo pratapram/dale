@@ -15,7 +15,17 @@ class IndexByParams(BaseModel):
     description: str
 
 
-@operation("index_by", IndexByParams, bounded_by_input=True, creates_handle=True)
+@operation(
+    "index_by",
+    IndexByParams,
+    io_signature="list → dict",
+    summary=(
+        'Build a unique-keyed `dict` (composite key → single record); errors '
+        'on duplicates'
+    ),
+    bounded_by_input=True,
+    creates_handle=True,
+)
 def index_by(registry: DataRegistry, params: IndexByParams) -> OperationOutput:
     """Build a unique-keyed dict (composite key -> single record). Duplicate
     keys are a data-integrity error, not silently overwritten."""
@@ -57,7 +67,14 @@ class GroupByParams(BaseModel):
     description: str
 
 
-@operation("group_by", GroupByParams, bounded_by_input=True, creates_handle=True)
+@operation(
+    "group_by",
+    GroupByParams,
+    io_signature="list → dict",
+    summary="Build a bucketed `dict` (composite key → list of records)",
+    bounded_by_input=True,
+    creates_handle=True,
+)
 def group_by(registry: DataRegistry, params: GroupByParams) -> OperationOutput:
     """Build a bucketed dict (composite key -> list of matching records)."""
     meta = registry.meta(params.handle)

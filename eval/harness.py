@@ -56,7 +56,10 @@ def describe_setup(use_case_name: str, setup: UseCaseSetup, task: str) -> str:
         *(f"  {line}" for line in registry_state_summary(registry).splitlines()),
         "",
         "OPERATIONS AVAILABLE:",
-        f"  {', '.join(dale.list_operations())}",
+        # Names alone said what the model could reach for but nothing about
+        # what any of it does, which is the part worth having in a trial log
+        # you read weeks later.
+        *(f"  {line}" for line in dale.render_catalog(format="compact").splitlines()),
     ]
     return "\n".join(lines)
 
