@@ -48,7 +48,13 @@ packages = ["src/dale"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["live: hits a real model provider; costs money; deselected by default"]
+markers = [
+    "live: hits a real model provider; costs money; deselected by default",
+    # Kept *selected* by default, unlike `live`: it costs ~30s and some disk, not
+    # money, and it is the only test covering the pipeline at 1M rows. Skip it
+    # explicitly with `-m "not slow"` when iterating.
+    "slow: generates and processes a ~1M-row dataset (~30s, ~120 MB of scratch CSV)",
+]
 # Belt and braces, on purpose. This keeps a bare `uv run pytest` at zero live
 # tests; the DALE_LIVE_TESTS=1 gate inside tests/test_agent_live.py then stops a
 # developer who types `-m live` with a key already in their shell from spending

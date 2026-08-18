@@ -1,0 +1,4 @@
+# The two ~60 MB CSVs are regenerated from generate.py (fixed seed, byte-for-byte
+# reproducible), so they don't belong in git. ground_truth.json is committed.
+users_2021.csv
+users_2022.csv
