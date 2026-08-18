@@ -36,7 +36,14 @@ def _sort_by_single_key(records: list[dict], field: str, descending: bool) -> li
     return with_value + without_value
 
 
-@operation("sort_by", SortByParams, bounded_by_input=True, creates_handle=True)
+@operation(
+    "sort_by",
+    SortByParams,
+    io_signature="list → list",
+    summary="Stable multi-key sort, nulls sorted last",
+    bounded_by_input=True,
+    creates_handle=True,
+)
 def sort_by(registry: DataRegistry, params: SortByParams) -> OperationOutput:
     """Stable multi-key sort of a list handle. Records missing a sort field
     are sorted last regardless of ascending/descending. Returns a new handle."""

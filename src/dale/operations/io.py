@@ -57,7 +57,18 @@ def _resolve_registered_file(registry: DataRegistry, file: str) -> Path:
     return path
 
 
-@operation("load_csv", LoadCsvParams, creates_handle=True)
+@operation(
+    "load_csv",
+    LoadCsvParams,
+    io_signature="file → list",
+    summary=(
+        'Load a local CSV into a `list` handle, with deterministic type '
+        'inference. Takes a `file` — a virtual name registered on a '
+        '`FileRegistry` ahead of time, never a raw path (see '
+        '[`docs/environment.md`](docs/environment.md))'
+    ),
+    creates_handle=True,
+)
 def load_csv(registry: DataRegistry, params: LoadCsvParams) -> OperationOutput:
     """Load a CSV file, referenced by an invoker-registered virtual name (not
     a raw path — see FileRegistry), into a new list-of-records handle, with
@@ -110,7 +121,22 @@ def _unwrap_envelope(data: dict[str, Any], file: str) -> list[Any]:
     return data[list_keys[0]]
 
 
-@operation("load_json", LoadJsonParams, creates_handle=True)
+@operation(
+    "load_json",
+    LoadJsonParams,
+    io_signature="file → list | dict",
+    summary=(
+        'Load a local JSON file into a `list` handle (top-level array) or '
+        '`dict` handle (top-level object) — JSON is a loading path, not a new '
+        'handle type. Same `file`-via-`FileRegistry` contract as `load_csv`. '
+        'Optional `remove_envelope=True` unwraps a single-list-key envelope '
+        '(e.g. Salesforce\'s `{"records": [...]}`) straight to a `list` handle '
+        '— only when the model explicitly asserts it recognizes the shape; '
+        'DALE never guesses this on its own. Nested structure is otherwise '
+        'preserved as-is'
+    ),
+    creates_handle=True,
+)
 def load_json(registry: DataRegistry, params: LoadJsonParams) -> OperationOutput:
     """Load a JSON file, referenced by an invoker-registered virtual name (not
     a raw path — see FileRegistry), into a new handle. A top-level JSON array

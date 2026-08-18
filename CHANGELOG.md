@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+### Print the operation catalog
+
+The only human-readable list of the operations was the table in `GUIDE.md`,
+hand-written, with nothing generating or checking it — add an operation and it
+silently went stale. The catalog can now be read straight from the code, three
+ways:
+
+```bash
+python -m dale operations                     # every operation, in full, with its parameters
+python -m dale operations --format compact    # the whole catalog at a glance
+python -m dale operations --format markdown   # the GUIDE.md table
+python -m dale operations reduce_by           # just one
+```
+
+`dale.render_catalog(names=None, *, format=..., width=...)` is the same
+rendering as a string. Both read the live catalog through `list_operations()` /
+`get_operation()`, so an operation registered downstream with `@operation`
+lists alongside the built-ins.
+
+- **`OperationSpec` gains `io_signature` and `summary`.** Both optional, both
+  documentation only — nothing dispatches on either. These were the two things
+  the GUIDE table said that the code did not: the handle types in and out
+  (`"list → dict"`), and a one-line purpose. `summary` is deliberately separate
+  from the docstring, because the docstring is shipped to the model as the
+  operation's tool description on every request; prose written for a human
+  reader is free here and is not there. An operation declaring neither still
+  renders, falling back to its docstring.
+- **`GUIDE.md`'s operation table is now generated** from those fields, by
+  `scripts/sync_guide_operations.py`, between markers. The surrounding prose is
+  still hand-written. `--check` fails the test suite when the table is stale,
+  so an undocumented operation is now an error rather than an omission. The
+  generated table is byte-identical to the one it replaced.
+- **`verbosity="raw"` prints the model's action space** once, before the run
+  starts — the `compact` rendering, narrowed to the operations that agent was
+  actually built with. A caller allowlist and `privacy_mode`'s withholding of
+  `peek` are both reflected in the header (`(3 of 17 — allowlist)`), since a
+  preamble claiming the full catalog would credit the model with calls it
+  cannot make. Nothing prints below `raw`.
+- **`eval/harness.py`'s `OPERATIONS AVAILABLE:` block** shows the compact
+  catalog instead of a comma-joined list of names.
+
 ## Unreleased — breaking
 
 ### Default action space is now `CORE_OPERATIONS`, not the whole catalog

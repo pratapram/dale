@@ -10,7 +10,12 @@ class ReleaseHandleParams(BaseModel):
     handle: str
 
 
-@operation("release_handle", ReleaseHandleParams)
+@operation(
+    "release_handle",
+    ReleaseHandleParams,
+    io_signature="any → —",
+    summary="Explicit cleanup of a handle no longer needed",
+)
 def release_handle(registry: DataRegistry, params: ReleaseHandleParams) -> OperationOutput:
     """Release a handle you no longer need — call this once you've built the
     next handle from it, so intermediate results don't accumulate."""

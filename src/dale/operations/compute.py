@@ -22,7 +22,17 @@ class ComputeFieldParams(BaseModel):
     description: str
 
 
-@operation("compute_field", ComputeFieldParams, bounded_by_input=True, creates_handle=True)
+@operation(
+    "compute_field",
+    ComputeFieldParams,
+    io_signature="list → list",
+    summary=(
+        'Add a derived field (`add`/`subtract`/`multiply`/`divide` over '
+        'fields or constants)'
+    ),
+    bounded_by_input=True,
+    creates_handle=True,
+)
 def compute_field(registry: DataRegistry, params: ComputeFieldParams) -> OperationOutput:
     """Add a derived field to every record in a list handle, computed from
     two operands (each a field reference or a constant) and an arithmetic

@@ -122,6 +122,13 @@ def graph_walk_resolve_cost_estimator(
 @operation(
     "graph_walk_resolve",
     GraphWalkResolveParams,
+    io_signature="dict + list → list",
+    summary=(
+        "Walk each node's single-parent ancestor chain in an `index_by`-built "
+        '`dict`, collect applicable rules per group field, resolve conflicts '
+        'via `resolve_priority` — the "Adjacency Graph Traversal" pattern '
+        '(org-chart permission inheritance)'
+    ),
     cost_estimator=graph_walk_resolve_cost_estimator,
     creates_handle=True,
 )

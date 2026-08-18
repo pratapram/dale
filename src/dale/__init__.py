@@ -20,6 +20,7 @@ from dale.catalog import (
     register_operation,
 )
 from dale.cost import CostEstimate
+from dale.describe import CatalogFormat, render_catalog
 from dale.dispatch import call_operation
 from dale.errors import (
     DaleError,
@@ -72,6 +73,8 @@ __all__ = [
     "operation",
     "get_operation",
     "list_operations",
+    "render_catalog",
+    "CatalogFormat",
     "OperationOutput",
     "OperationSpec",
     "ConfirmableParams",

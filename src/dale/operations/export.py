@@ -69,7 +69,16 @@ def _write_json(path: Path, value: Any, handle_type: str) -> int:
     return path.stat().st_size
 
 
-@operation("export_handle", ExportHandleParams)
+@operation(
+    "export_handle",
+    ExportHandleParams,
+    io_signature="list | dict → file",
+    summary=(
+        "Write a handle's real content straight to a registered output "
+        'destination (CSV or JSON) — the LLM gets back only a confirmation '
+        '(row/byte count), never the content itself'
+    ),
+)
 def export_handle(registry: DataRegistry, params: ExportHandleParams) -> OperationOutput:
     """Write a handle's real content to a registered output destination.
     Returns only a confirmation (format, row/byte count) — never the

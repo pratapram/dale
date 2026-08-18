@@ -99,7 +99,22 @@ def _order_once(records: list[dict], key: OrderKey) -> list[dict]:
     return with_value + without_value
 
 
-@operation("reduce_by", ReduceByParams, bounded_by_input=True, creates_handle=True)
+@operation(
+    "reduce_by",
+    ReduceByParams,
+    io_signature="list → dict",
+    summary=(
+        '`index_by`, but for duplicate keys instead of erroring: keeps one '
+        'record per key — the first under `order_by`. Order by a field '
+        '(`{field, order}`: highest score, latest timestamp) or by an '
+        'explicit `ranking` of values (`["gold","silver","bronze"]`); '
+        'unranked and missing values sort last. Returns whole records, or '
+        'just one field\'s value with `value_field`. The "group + argmax" '
+        "pattern (SQL's `ROW_NUMBER() … = 1`)"
+    ),
+    bounded_by_input=True,
+    creates_handle=True,
+)
 def reduce_by(registry: DataRegistry, params: ReduceByParams) -> OperationOutput:
     """Group by key_fields and keep exactly one record per key -- the first
     under `order_by`. Where `index_by` rejects a duplicate key and `group_by`

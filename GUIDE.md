@@ -329,6 +329,7 @@ a newly created handle is `out.handle.name`. Operations that create a handle set
 leave `.result` empty; inspection operations (`peek`, `describe`) do the reverse; a refused operation
 returns `status="cost_gate_exceeded"` with its `.estimate` and no handle at all.
 
+<!-- BEGIN GENERATED: operations. Regenerate with scripts/sync_guide_operations.py -->
 | Operation | In → Out | Purpose |
 |---|---|---|
 | `load_csv` | file → list | Load a local CSV into a `list` handle, with deterministic type inference. Takes a `file` — a virtual name registered on a `FileRegistry` ahead of time, never a raw path (see [`docs/environment.md`](docs/environment.md)) |
@@ -348,6 +349,26 @@ returns `status="cost_gate_exceeded"` with its `.estimate` and no handle at all.
 | `describe` | any → stats | Aggregate statistics for a field (numeric min/max/mean/null-rate, or categorical distinct-count/top-k) — never individual values dumped in bulk. `top_k`'s *values* are subject to the same byte cap and the same in-place markers as `peek`; its counts never are |
 | `release_handle` | any → — | Explicit cleanup of a handle no longer needed |
 | `export_handle` | list \| dict → file | Write a handle's real content straight to a registered output destination (CSV or JSON) — the LLM gets back only a confirmation (row/byte count), never the content itself |
+<!-- END GENERATED: operations -->
+
+**That table is generated from the catalog**, by `scripts/sync_guide_operations.py`, from the
+`io_signature` and `summary` fields each operation is registered with — so adding an operation
+without documenting it fails the test suite rather than going unnoticed. Don't hand-edit the rows;
+change the registration and re-run the script.
+
+The same catalog prints three ways from the command line, no code to write:
+
+```bash
+python -m dale operations                     # every operation, in full, with its parameters
+python -m dale operations --format compact    # the whole catalog at a glance
+python -m dale operations --format markdown   # the table above
+python -m dale operations reduce_by           # just one
+```
+
+`dale.render_catalog(names=None, *, format=..., width=...)` is the same thing as a string. Both read
+the live catalog, so an operation you registered yourself with `@operation` lists alongside the
+built-ins. `dale.agent` prints the `compact` form at `verbosity="raw"`, narrowed to the operations
+that agent was actually offered — see [`docs/agent.md`](docs/agent.md).
 
 **The table gives purpose; the library gives parameters.** There is no hand-written parameter table
 anywhere — it would drift. Ask the catalog instead; this is the same schema the LLM is handed, so
@@ -460,11 +481,31 @@ them, without hardcoding an operation-name list (`src/dale/catalog.py`). Pass a 
 keep pre-execution cost estimation intact, or `bounded_by_input=True` if the output is provably no
 larger than the input.
 
+`io_signature=` and `summary=` are documentation, read only by `dale.render_catalog` and the
+GUIDE.md generator — nothing dispatches on them. Both are optional, and an operation without them
+falls back to its docstring, so a third-party registration prints fine as-is. Built-ins are
+required to declare both (`tests/test_describe.py`), which is what keeps the table above honest:
+
+```python
+@operation(
+    "my_operation",
+    MyParams,
+    io_signature="list → dict",
+    summary="What it does, in one line, for a human reading the catalog",
+    creates_handle=True,
+)
+```
+
+`summary` exists separately from the docstring because the docstring is not free: it ships to the
+model as the operation's tool description on **every request**. Prose aimed at a human reader —
+links, emphasis, the caveat that only matters when you are choosing between two operations —
+belongs in `summary`, which the agent path never reads.
+
 ## Development
 
 ```bash
-uv sync --extra dev --extra agent && uv run pytest -q   # 389 passed, 1 deselected
-uv sync --extra dev && uv run pytest -q                 # core only — 229 passed, 7 skipped
+uv sync --extra dev --extra agent && uv run pytest -q   # 462 passed, 1 deselected
+uv sync --extra dev && uv run pytest -q                 # core only — 297 passed, 12 skipped
 ```
 
 Both lines start with `uv sync`, deliberately: `uv sync` *replaces* the environment's extras, so it

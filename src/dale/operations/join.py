@@ -99,7 +99,15 @@ def join_cost_estimator(registry: DataRegistry, params: JoinLookupParams) -> Cos
 
 
 @operation(
-    "join_lookup", JoinLookupParams, cost_estimator=join_cost_estimator, creates_handle=True
+    "join_lookup",
+    JoinLookupParams,
+    io_signature="list + dict → list",
+    summary=(
+        'Merge a `list` against an `index_by`/`group_by`-built `dict`; real '
+        'fan-out risk, and a real cost estimator'
+    ),
+    cost_estimator=join_cost_estimator,
+    creates_handle=True,
 )
 def join_lookup(registry: DataRegistry, params: JoinLookupParams) -> OperationOutput:
     """Merge a list handle against a dict handle built by index_by/group_by,
