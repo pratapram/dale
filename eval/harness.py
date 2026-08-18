@@ -19,7 +19,13 @@ from typing import Any, Callable
 from pydantic_ai.usage import RunUsage
 
 import dale
-from dale.agent import ActionLog, TokenUsage, build_agent, registry_state_summary
+from dale.agent import (
+    ALL_OPERATIONS,
+    ActionLog,
+    TokenUsage,
+    build_agent,
+    registry_state_summary,
+)
 
 UseCaseSetup = Callable[[dale.DataRegistry], None]
 Checker = Callable[[dale.DataRegistry, ActionLog, str], bool]
@@ -240,6 +246,7 @@ def run_trial(
     verbose: bool = True,
     max_steps_per_call: int | None = None,
     usage_limits: Any | None = None,
+    operations: Any = ALL_OPERATIONS,
 ) -> TrialResult:
     """`max_steps_per_call=1` runs the same use case one operation per round
     trip — paired with TokenUsage.requests, that's paper.md Section 4.2 part
@@ -261,6 +268,14 @@ def run_trial(
         model=model,
         verbosity="debug" if verbose else "quiet",
         max_steps_per_call=max_steps_per_call,
+        # Explicitly the whole catalog, not the default. build_agent's default
+        # is CORE_OPERATIONS, which excludes window_flag and graph_walk_resolve
+        # -- uc2 and uc4 would silently become unsolvable, and every other
+        # number would describe a different system than the ones already
+        # recorded in the project's measurement notes. A trial arm that wants a
+        # narrowed catalog passes it deliberately; the baseline never inherits
+        # one from a default that moved.
+        operations=operations,
     )
 
     # Owned here, not read off the result afterward: run_sync accumulates into
@@ -309,6 +324,7 @@ def run_trials(
     verbose: bool = True,
     max_steps_per_call: int | None = None,
     usage_limits: Any | None = None,
+    operations: Any = ALL_OPERATIONS,
 ) -> TrialSummary:
     """Prints progress at two levels, both flushed immediately rather than
     buffered until the whole batch finishes: per-trial start/elapsed-time
@@ -337,6 +353,7 @@ def run_trials(
             verbose=verbose,
             max_steps_per_call=max_steps_per_call,
             usage_limits=usage_limits,
+            operations=operations,
         )
         elapsed = time.monotonic() - start
         outcome = "ok" if result.success else "FAILED"

@@ -42,7 +42,7 @@ from pathlib import Path
 import dale
 
 try:
-    from dale.agent import ActionLog, build_agent, pick_model
+    from dale.agent import CORE_OPERATIONS, ActionLog, build_agent, pick_model
 except ImportError:
     print(
         "Missing the 'pydantic-ai' package. Install the agent extra:\n"
@@ -79,7 +79,17 @@ def main() -> None:
     print(f"TASK: {task}\n")
 
     action_log = ActionLog()
-    agent = build_agent(registry, action_log, model=model, verbosity=verbosity)
+    # `operations=` is how a deployment pays for only what it uses: the
+    # run_plan schema is ~78% of every request, and the default (CORE_OPERATIONS)
+    # is about half the full catalog. load_csv is not in the core, so this task
+    # -- which loads its own file -- has to ask for it.
+    agent = build_agent(
+        registry,
+        action_log,
+        model=model,
+        verbosity=verbosity,
+        operations=[*CORE_OPERATIONS, "load_csv"],
+    )
 
     # verbosity != "quiet" prints each step live as it happens (build_tools'
     # own doing) — nothing further to print here, so no redundant re-print

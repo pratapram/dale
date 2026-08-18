@@ -23,6 +23,8 @@ import sys
 try:
     from pydantic_ai.usage import UsageLimits
 
+    from dale.agent import ALL_OPERATIONS
+
     from eval.harness import describe_setup, run_trials
     from eval.use_cases import USE_CASES
 except ImportError:
@@ -45,6 +47,15 @@ def main() -> None:
         default=None,
         metavar="N",
         help="cap steps per turn; 1 is the unbatched condition (Section 4.2 part F)",
+    )
+    parser.add_argument(
+        "--operations",
+        default=None,
+        metavar="LIST",
+        help="comma-separated operation allowlist for this arm, e.g. "
+        "'filter_where,sort_by,index_by'. Default is the whole catalog, which is "
+        "what every recorded baseline was measured with. This is the catalog-pruning "
+        "ablation (issue #22): narrow it and compare tokens *per run*, not per request.",
     )
     parser.add_argument(
         "--max-requests",
@@ -71,6 +82,14 @@ def main() -> None:
     usage_limits = (
         UsageLimits(request_limit=args.max_requests) if args.max_requests is not None else None
     )
+    # An unknown name raises from _selected_operations with the full known list,
+    # rather than silently shrinking the catalog and surfacing many model turns
+    # later as "it never tried filter_where".
+    operations = (
+        [n.strip() for n in args.operations.split(",") if n.strip()]
+        if args.operations
+        else ALL_OPERATIONS
+    )
 
     print(describe_setup(args.use_case, setup, task), flush=True)
     print(f"\nRunning {args.n} trial(s) against {args.model}...\n", flush=True)
@@ -83,6 +102,7 @@ def main() -> None:
         args.n,
         max_steps_per_call=args.steps_per_call,
         usage_limits=usage_limits,
+        operations=operations,
     )
     print(summary.render())
 
