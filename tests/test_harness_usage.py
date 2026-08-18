@@ -111,7 +111,9 @@ def test_usage_unavailable_for_synthetic_models():
                     )
                 ]
             )
-        return ModelResponse(parts=[ToolCallPart("final_result", {"note": "done"})])
+        return ModelResponse(
+            parts=[ToolCallPart("final_result", {"handle": "items", "note": "done"})]
+        )
 
     log = ActionLog()
     agent = build_agent(registry, log, model=FunctionModel(emit))

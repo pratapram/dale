@@ -354,14 +354,40 @@ def run_agent(
     wall_clock_s = time.perf_counter() - started
     usage = TokenUsage.from_run(accumulator, result.all_messages(), model=agent.model)
 
+    out = result.output
+    # A blocked run is a failed run, reported through the same field a caller
+    # already checks. The alternative -- success=True carrying status="blocked"
+    # -- would mean every invoker needs a second condition to notice the task
+    # was not done, and the ones who forget get a "successful" run with no
+    # result. There is nothing to materialize either way, so this is the honest
+    # mapping rather than a lossy one.
+    if out.status == "blocked":
+        if verbosity != "quiet":
+            block = f"Result: Blocked\n  {out.code}: {out.note}"
+            if rendered := usage.render():
+                block += f"\n{rendered}"
+            block += "\n" + _render_run_timing(
+                wall_clock_s,
+                action_log,
+                host_ms_before=host_ms_before,
+                auto_inspect_ms_before=auto_inspect_ms_before,
+            )
+            if used := action_log.operations_used():
+                block += f"\n  operations used: {used!r}"
+            print(block, flush=True)
+        return AgentRunOutcome(
+            success=False,
+            result=result,
+            error=f"{out.code}: {out.note}",
+            usage=usage,
+            wall_clock_s=wall_clock_s,
+        )
+
     if verbosity != "quiet":
-        out = result.output
         if out.handle:
             where = f"handle={out.handle!r}"
-        elif out.exported_to:
-            where = f"exported_to={out.exported_to!r}"
         else:
-            where = "(no handle or exported_to set)"
+            where = f"exported_to={out.exported_to!r}"
         block = f"Result: Success\n  {where}\n  note: {out.note}"
         if rendered := usage.render():
             block += f"\n{rendered}"

@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased — breaking
+
+### `DaleResult` gains `status`/`code`, so a run can report that it is blocked
+
+DALE was rigorous about per-call results and silent about the run-level one. Every operation returns
+`{"status": ..., "code": ...}` and `run_plan` returns `{"status": "ok"|"partial", ...}`, but
+`DaleResult` carried only `handle`, `exported_to` and `note`. Three consequences:
+
+- **The model had no way to say "I can't."** Its only exit is a tool named `final_result`, so taking
+  the exit asserted a result existed.
+- **A run could report success while pointing at nothing.** `DaleResult(note="...")` with neither
+  destination set validated fine, `run_agent` returned `success=True`, and the caller's
+  `registry.materialize(None)` then raised `HandleNotFoundError` — *after* their success check
+  passed.
+- **A withheld operation was invisible.** Absent from `run_plan`'s union, the model could not name
+  it and no error existed to react to, so it improvised a worse pipeline (the accepted risk when the
+  core catalog became the default).
+
+```python
+DaleResult(
+    status="blocked",
+    code="OPERATION_UNAVAILABLE",
+    note="needs join_lookup, which was not offered this session",
+)
+# run_agent -> AgentRunOutcome(success=False, error="OPERATION_UNAVAILABLE: ...")
+```
+
+`status` is `"ok"` (default) or `"blocked"`. `code` is a **closed** `Literal` —
+`OPERATION_UNAVAILABLE`, `DATA_INSUFFICIENT`, `TASK_UNCLEAR` — for the same reason the rest of the
+grammar is closed: the model picks from a fixed vocabulary rather than inventing one, with `note`
+carrying the specifics.
+
+**Breaking**, via a new validator enforcing the two shapes:
+
+- `status="ok"` now **requires** `handle` or `exported_to`. A model claiming success with neither
+  fails output validation and pydantic-ai sends it back to fix, instead of succeeding emptily.
+- `status="blocked"` requires `code` and forbids `handle`/`exported_to`.
+
+Anything constructing `DaleResult(note=...)` with no destination — including test fixtures and
+`FunctionModel` stand-ins — must now supply one. No shim, per the 0.2.0 precedent.
+
+`run_agent` maps a blocked result to `AgentRunOutcome(success=False, ...)` so an invoker's existing
+`if not outcome.success` catches it with no new branch, and still attaches `result` so the
+structured `code` need not be parsed back out of the error string. The system prompt gained a
+paragraph stating that declining is a complete, useful answer rather than a failure to avoid.
+
+Costs ~444 chars of output-tool schema, about 117 tokens per request or ~1.9% of a run's input
+tokens — measured, and traded knowingly against a class of silent failure.
+
 ## Unreleased
 
 ### Print the operation catalog
