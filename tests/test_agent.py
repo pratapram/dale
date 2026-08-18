@@ -7,12 +7,14 @@ import pytest
 
 pytest.importorskip("pydantic_ai")
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 
 import dale
 from dale.agent import (
+    ALL_OPERATIONS,
+    CORE_OPERATIONS,
     ActionLog,
     AgentLoopTerminated,
     build_agent,
@@ -138,7 +140,7 @@ def test_every_operation_is_reachable_as_a_step():
     """The catalog didn't shrink when the tools did — every operation is still
     offered, just through one surface. Asserted on the *published* discriminator
     mapping, which is what the model dispatches on."""
-    tool, _ = _run_plan()
+    tool, _ = _run_plan(operations=ALL_OPERATIONS)
     assert set(_step_mapping(tool)) == set(dale.list_operations())
     assert set(_step_defs(tool)) == set(dale.list_operations())
 
@@ -148,7 +150,7 @@ def test_intent_is_required_on_every_step_variant():
     per-field *description* deliberately does not (it is stated once in
     DEFAULT_SYSTEM_PROMPT instead) — requiredness is not documentation, and
     must not travel with it."""
-    tool, _ = _run_plan()
+    tool, _ = _run_plan(operations=ALL_OPERATIONS)
     variants = _step_defs(tool)
     assert len(variants) == len(dale.list_operations())
     for name, schema in variants.items():
@@ -169,7 +171,7 @@ def test_the_step_discriminator_is_the_wire_field_operation():
     saying `primitive` would fail every model call with a validation error the
     model cannot repair, because the schema it was shown would disagree with
     the schema it is validated against."""
-    tool, _ = _run_plan()
+    tool, _ = _run_plan(operations=ALL_OPERATIONS)
     steps = _published(tool)["properties"]["steps"]
 
     assert steps["items"]["discriminator"]["propertyName"] == "operation"
@@ -1395,7 +1397,7 @@ def test_peek_is_absent_from_the_step_union_under_privacy_mode():
     `$defs` but missing from the discriminator mapping (or vice versa) is
     exactly the half-done version of this change that a tool-name assertion
     could no longer see, since the name set is `{"run_plan"}` either way."""
-    tool, _ = _run_plan(privacy_mode=True)
+    tool, _ = _run_plan(operations=ALL_OPERATIONS, privacy_mode=True)
 
     assert "peek" not in _step_mapping(tool)
     assert "peek" not in _step_defs(tool)
@@ -1914,7 +1916,7 @@ def test_every_plan_step_variant_carries_its_operations_docstring():
     tool description carried for no reason. That is the only difference between
     what these variants publish and what the named tools published, and it is
     in the right direction."""
-    tool, _ = _run_plan()
+    tool, _ = _run_plan(operations=ALL_OPERATIONS)
     variants = _step_defs(tool)
 
     # Exactly the catalog -- a silently dropped variant fails here too.
@@ -2345,10 +2347,44 @@ def test_the_allowlist_does_not_restrict_call_operation(registry):
     assert registry.materialize("kept_list") == [{"name": "Widget", "keep": True}]
 
 
-def test_operations_none_is_todays_behaviour():
-    """The backward-compatible default, pinned."""
+def test_operations_none_is_the_core_catalog():
+    """The default action space, pinned. `None` means CORE_OPERATIONS, not the
+    whole catalog: the run_plan schema is ~78% of a request body, so the
+    default decides what almost every deployment pays on every request.
+
+    Pinned as an exact set rather than a size, because the failure this guards
+    is an operation drifting into or out of the default without anyone
+    deciding it should."""
     tool, _ = _run_plan(operations=None)
+    assert set(_step_mapping(tool)) == set(CORE_OPERATIONS)
+    assert set(CORE_OPERATIONS) < set(dale.list_operations())
+
+
+def test_all_operations_sentinel_yields_the_whole_catalog():
+    tool, _ = _run_plan(operations=ALL_OPERATIONS)
     assert set(_step_mapping(tool)) == set(dale.list_operations())
+
+
+def test_all_operations_resolves_at_call_time_not_import_time():
+    """A deployment's own register_operation additions must appear in its
+    "all". A tuple constant computed at import would freeze the catalog before
+    those calls ran, and the deployment's own operations would be silently
+    missing from the one setting that means "everything"."""
+
+    class _LateParams(BaseModel):
+        handle: str
+
+    def _late_op(registry, params):
+        """A deployment's own operation, registered after import."""
+
+    dale.register_operation("_late_registered_op", _late_op, _LateParams)
+    try:
+        tool, _ = _run_plan(operations=ALL_OPERATIONS)
+        assert "_late_registered_op" in _step_mapping(tool)
+        # ...and is not silently swept into the default, which stays curated.
+        assert "_late_registered_op" not in set(CORE_OPERATIONS)
+    finally:
+        dale.catalog._CATALOG.pop("_late_registered_op", None)
 
 
 def test_the_allowlist_and_privacy_mode_compose():

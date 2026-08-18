@@ -2,6 +2,48 @@
 
 ## Unreleased — breaking
 
+### Default action space is now `CORE_OPERATIONS`, not the whole catalog
+
+`build_agent(...)` without an `operations=` argument previously offered all 17 operations. It now
+offers 9. **This is a silent behaviour change**: a caller relying on the full catalog without
+saying so loses `join_lookup`, `window_flag`, `graph_walk_resolve`, `dict_diff`, `reduce_by`,
+`flatten_json`, `load_csv`, `load_json` and `export_handle`. Because withheld operations are absent
+from the `run_plan` union, the model cannot express them and there is no error to catch — only a
+worse pipeline, or a failure several turns later. No back-compat shim, per the 0.2.0 precedent.
+
+```python
+build_agent(reg, log)                                        # core (9 ops)
+build_agent(reg, log, operations=[*CORE_OPERATIONS, "load_csv"])   # opt-in
+build_agent(reg, log, operations=ALL_OPERATIONS)             # whole catalog
+```
+
+**Why.** The `run_plan` schema is ~78% of every request body and is transmitted 2-4 times per run,
+regardless of dataset size. The core catalog is 10,591 chars against the full catalog's 20,752 — a
+49% cut in the single largest line item in DALE's token cost, now applied by default rather than
+only for deployments that knew the setting existed.
+
+**What is in the core**, chosen from measured use across 245 trial runs of the four evaluation use
+cases rather than intuition: `filter_where`, `sort_by`, `index_by`, `group_by`, `join_lookup`,
+`compute_field`, `peek`, `describe`, `release_handle`. `release_handle` was the only operation all
+four use cases touched; `filter_where`/`index_by`/`join_lookup`/`sort_by` appeared in three of four.
+Everything excluded appeared in at most one -- or, for the loaders, appeared in none only because
+those fixtures load data invoker-side before the model runs.
+
+`ALL_OPERATIONS` is the string `"all"`, resolved at call time rather than a tuple constant: a
+constant computed at import would freeze the catalog before a deployment's own `register_operation`
+calls had run, so its "all" would silently exclude its own operations.
+
+### `ActionLog.operations_used()`
+
+Returns the sorted set of operations a run actually called — the allowlist to ship, derived from a
+real run instead of guessed. Failed calls are included deliberately: a rejected `join_lookup` still
+proves the model reached for it, and excluding it would produce an allowlist missing exactly the
+operation the model was struggling with. `run_agent` prints it at any verbosity above `"quiet"`.
+
+The intended workflow is develop against `ALL_OPERATIONS`, read this, ship that list.
+
+## Unreleased — breaking
+
 ### `priority_reduce` → `reduce_by`
 
 `priority_reduce` fused a general mechanism with a single hardcoded policy. The

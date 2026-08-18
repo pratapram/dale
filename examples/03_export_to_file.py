@@ -33,7 +33,7 @@ from pathlib import Path
 import dale
 
 try:
-    from dale.agent import ActionLog, build_agent, pick_model
+    from dale.agent import CORE_OPERATIONS, ActionLog, build_agent, pick_model
 except ImportError:
     print(
         "Missing the 'pydantic-ai' package. Install the agent extra:\n"
@@ -78,7 +78,14 @@ def main() -> None:
 
     action_log = ActionLog()
     action_log.seed_from_registry(registry)
-    agent = build_agent(registry, action_log, model=model)
+    # This task both loads a file and writes one, and neither loader nor
+    # exporter is in the default core -- so both are named explicitly.
+    agent = build_agent(
+        registry,
+        action_log,
+        model=model,
+        operations=[*CORE_OPERATIONS, "load_csv", "export_handle"],
+    )
 
     result = agent.run_sync(task, deps=registry)
 

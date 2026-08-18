@@ -26,7 +26,7 @@ from pathlib import Path
 import dale
 
 try:
-    from dale.agent import ActionLog, build_agent, pick_model
+    from dale.agent import CORE_OPERATIONS, ActionLog, build_agent, pick_model
 except ImportError:
     print(
         "Missing the 'pydantic-ai' package. Install the agent extra:\n"
@@ -80,7 +80,14 @@ def main() -> None:
 
     action_log = ActionLog()
     action_log.seed_from_registry(registry)
-    agent = build_agent(registry, action_log, model=model)
+    # reduce_by and dict_diff are the two operations this pipeline turns on --
+    # both outside the default core, since most pipelines never need them.
+    agent = build_agent(
+        registry,
+        action_log,
+        model=model,
+        operations=[*CORE_OPERATIONS, "reduce_by", "dict_diff"],
+    )
 
     result = agent.run_sync(task, deps=registry)
 

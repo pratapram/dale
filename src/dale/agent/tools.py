@@ -30,15 +30,55 @@ from dale.agent.execution import (
 from dale.agent.log import ActionLog, Verbosity, render_raw_messages
 
 
+CORE_OPERATIONS: tuple[str, ...] = (
+    "filter_where",
+    "sort_by",
+    "index_by",
+    "group_by",
+    "join_lookup",
+    "compute_field",
+    "peek",
+    "describe",
+    "release_handle",
+)
+"""The operations offered when a caller names none — DALE's default action
+space, and roughly half the schema of the full catalog (10,591 vs 20,752
+chars, measured; the `run_plan` schema is ~78% of a request body, so this is
+the largest token lever a deployment has).
+
+Chosen from measured use, not intuition: across 245 trial runs of the four
+evaluation use cases, `release_handle` was the only operation all four
+touched, and `filter_where`/`index_by`/`join_lookup`/`sort_by` appeared in
+three of four. Everything here appeared in at least two; everything left out
+appeared in at most one, or (the loaders) only because those fixtures load
+data invoker-side before the model runs.
+
+Deliberately excludes the loaders. A deployment whose model ingests its own
+files passes them explicitly — `load_csv` is also the operation with the
+narrowest blast radius if offered without being needed, since it can only
+reach files the invoker registered on a FileRegistry anyway."""
+
+ALL_OPERATIONS = "all"
+"""Pass as `operations=` for the entire catalog, including anything a
+deployment registered via `register_operation`.
+
+A string sentinel resolved at call time rather than a tuple constant: a
+constant computed at import would freeze the catalog before a deployment's own
+`register_operation` calls had run, so its "all" would silently exclude its own
+operations. The intended workflow is to develop against this, read
+`ActionLog.operations_used()`, and ship that list."""
+
+
 def _selected_operations(
-    operations: Sequence[str] | None, *, privacy_mode: bool
+    operations: Sequence[str] | str | None, *, privacy_mode: bool
 ) -> list[str]:
     """Which operations the model is offered as `run_plan` steps — the single
     place either filter below is applied, so there is no second copy to drift.
 
-    `operations` (default `None` = the whole catalog, today's behaviour) is the
-    caller's allowlist, for a deployment that knows its task needs nine of the
-    seventeen. An unknown name is a ValueError, not a silent drop: a typo would
+    `operations` selects the model's action space. `None` (the default) is
+    CORE_OPERATIONS; `ALL_OPERATIONS` ("all") is the whole catalog, resolved
+    at call time so a deployment's own register_operation additions are
+    included; a sequence is an explicit allowlist. An unknown name is a ValueError, not a silent drop: a typo would
     otherwise shrink the catalog and surface many model turns later as an
     inexplicable "it never tried filter_where". Read as a set against
     `dale.list_operations()` order, so a caller's ordering or a duplicate can't
@@ -54,6 +94,11 @@ def _selected_operations(
     values" under this design's own definition, only categorical top_k is
     redacted."""
     catalog = dale.list_operations()
+    if operations == ALL_OPERATIONS:
+        # Resolved here, not at import — see ALL_OPERATIONS.
+        operations = catalog
+    elif operations is None:
+        operations = [n for n in CORE_OPERATIONS if n in catalog]
     if operations is not None:
         unknown = sorted(set(operations) - set(catalog))
         if unknown:
@@ -91,7 +136,7 @@ def build_tools(
     repetition_limit: int | None = _REPETITION_LIMIT_DEFAULT,
     privacy_mode: bool = False,
     max_steps_per_call: int | None = None,
-    operations: Sequence[str] | None = None,
+    operations: Sequence[str] | str | None = None,
 ) -> list[Tool]:
     """The model's entire tool surface: exactly one PydanticAI Tool, `run_plan`,
     whose `steps` are a discriminated union generated from the live operation
@@ -288,7 +333,7 @@ def _build_run_plan_tool(
     repetition_limit: int | None,
     privacy_mode: bool,
     max_steps_per_call: int | None = None,
-    operations: Sequence[str] | None = None,
+    operations: Sequence[str] | str | None = None,
 ) -> Tool:
     """`run_plan` — agent-layer orchestration, not an `@operation`/catalog
     entry (it doesn't operate on data itself, so it isn't in

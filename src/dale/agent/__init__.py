@@ -86,6 +86,8 @@ from dale.agent.prompt import (
     registry_state_summary,
 )
 from dale.agent.tools import (
+    ALL_OPERATIONS,
+    CORE_OPERATIONS,
     _build_run_plan_tool,
     _call_params,
     _params_for_plan_step,
@@ -102,11 +104,13 @@ from dale.agent.usage import (
 )
 
 __all__ = [
+    "ALL_OPERATIONS",
     "ActionLog",
     "ActionLogEntry",
     "AgentLoopTerminated",
     "AgentRunOutcome",
     "DaleResult",
+    "CORE_OPERATIONS",
     "DEFAULT_SYSTEM_PROMPT",
     "HandleLabel",
     "TokenUsage",
@@ -156,7 +160,7 @@ def build_agent(
     repetition_nudge: bool = True,
     repetition_limit: int | None = _REPETITION_LIMIT_DEFAULT,
     max_steps_per_call: int | None = None,
-    operations: Sequence[str] | None = None,
+    operations: Sequence[str] | str | None = None,
     model_settings: dict[str, Any] | None = None,
 ) -> Agent:
     """`peek_at_every_step` (default True) is ignored entirely — no initial
@@ -329,6 +333,11 @@ def run_agent(
             host_ms_before=host_ms_before,
             auto_inspect_ms_before=auto_inspect_ms_before,
         )
+        # Printed as a paste-ready literal, not prose: the point is to hand the
+        # invoker the `operations=` list this run justifies, so the cheap
+        # catalog comes from a real run rather than a guess.
+        if used := action_log.operations_used():
+            block += f"\n  operations used: {used!r}"
         print(block, flush=True)
 
     return AgentRunOutcome(

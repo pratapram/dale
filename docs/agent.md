@@ -28,8 +28,33 @@ the model never chooses between two encodings of the same call.
 
 - `max_steps_per_call=1` caps a plan at one step, reproducing the unbatched, one-call-per-turn
   condition (this is the ablation the paper's evaluation plan needs).
-- `operations=[...]` restricts which operations are offered as steps at all. `dale.call_operation`
-  stays unrestricted — the allowlist is about the model's action space, not the engine's.
+- `operations=` selects the model's action space, and is **the largest token lever a deployment
+  has**. The `run_plan` schema is ~78% of a request body and is sent on every request, so what is
+  in it dominates cost regardless of dataset size — a 3-row question pays the same catalog cost as
+  a 10,000-row one. Three modes:
+
+  | value | offered | schema |
+  |---|---|---|
+  | omitted (default) | `CORE_OPERATIONS`, 9 ops | 10,591 chars |
+  | `ALL_OPERATIONS` | the whole catalog, 17 ops | 20,752 chars |
+  | `[...]` | exactly what you name | scales with the list |
+
+  The core is `filter_where`, `sort_by`, `index_by`, `group_by`, `join_lookup`, `compute_field`,
+  `peek`, `describe`, `release_handle` — chosen from measured use across 245 trial runs, not
+  intuition. Loaders (`load_csv`/`load_json`), `export_handle`, and the specialist algorithms
+  (`window_flag`, `graph_walk_resolve`, `dict_diff`, `reduce_by`, `flatten_json`) are opt-in.
+
+  **Don't guess the list — measure it.** Develop against `ALL_OPERATIONS`, then read
+  `ActionLog.operations_used()`, which returns a paste-ready allowlist of what the run actually
+  called (failed calls included: a rejected `join_lookup` still proves the pipeline needed it).
+  `run_agent` prints it at any verbosity above `"quiet"`:
+
+  ```
+  operations used: ['compute_field', 'filter_where', 'index_by', 'join_lookup', 'sort_by']
+  ```
+
+  `dale.call_operation` stays unrestricted throughout — the allowlist constrains the model's action
+  space, not the engine's, so a host loading its own fixtures is unaffected.
 
 **Per-step fields.** Every step injects one extra required field, `intent` — a short
 natural-language note on why the model is making that specific call. It is stripped before the call

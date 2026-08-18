@@ -242,6 +242,22 @@ class ActionLog(BaseModel):
         into the operations it wraps."""
         return sum(e.auto_inspect_ms for e in self.entries)
 
+    def operations_used(self) -> list[str]:
+        """Every operation this run actually called, sorted — the allowlist to
+        ship, derived from a real run instead of guessed.
+
+        The intended workflow: develop against `operations=ALL_OPERATIONS`, read
+        this, and pass the result as `operations=` in production. The `run_plan`
+        schema is ~78% of a request body, so narrowing it is the largest token
+        lever a deployment has, and guessing the list is how an operation gets
+        withheld that the pipeline actually needed.
+
+        Failed calls count. A rejected `join_lookup` still proves the model
+        reached for it, and excluding it would produce an allowlist that omits
+        exactly the operation the model was struggling to use correctly — the
+        worst possible thing to prune."""
+        return sorted({e.operation for e in self.entries})
+
     def seed_from_registry(self, registry: dale.DataRegistry) -> None:
         """Register handles that exist before the agent's first tool call —
         e.g. CSV files or in-memory data an eval harness or invoker loaded
