@@ -38,15 +38,43 @@ def _load(registry: dale.DataRegistry, path: Path) -> str:
 
 
 def _alive_lists(registry: dale.DataRegistry):
+    """Every set of records still reachable at the end of a run, whether it is
+    held as a list handle or inside a dict one.
+
+    Dict handles are included because a model that grouped or indexed its
+    answer and then released the flat list has still *produced* the answer --
+    the records are in the buckets. Scanning list handles alone made an
+    optional tidy-up step look like a wrong answer: two uc2 trials computed the
+    correct 8 flagged rows, called group_by, released the list, and were scored
+    as failures because only a dict survived. Third instance of this class
+    after uc1's join ambiguity and uc2's hardcoded flag-field name (eval/
+    README.md) -- each time the checker encoded one shape of a correct answer.
+
+    Widening where a checker looks is not widening what passes: the callers
+    below compare exact sets and counts, so a wrong answer found in a dict
+    fails on the same terms it would as a list.
+    """
     for meta in registry.list_handles():
-        if meta.type != "list":
-            continue
         try:
-            rows = registry.materialize(meta.name)
+            data = registry.materialize(meta.name)
         except Exception:
             continue
-        if rows and isinstance(rows[0], dict):
-            yield rows
+
+        if meta.type == "list":
+            if data and isinstance(data[0], dict):
+                yield data
+        elif meta.type == "dict":
+            # group_by gives key -> [records]; index_by and reduce_by give
+            # key -> record. reduce_by with a value_field gives key -> scalar,
+            # which yields nothing here -- correctly, there are no records in it.
+            records = [
+                record
+                for value in data.values()
+                for record in (value if isinstance(value, list) else [value])
+                if isinstance(record, dict)
+            ]
+            if records:
+                yield records
 
 
 _ID_FIELDS = ("account_id", "key")

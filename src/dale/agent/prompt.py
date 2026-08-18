@@ -103,6 +103,14 @@ inspected" when that's true; that's a complete and useful answer, not one to \
 avoid. Always fill both in; they make the action log and the current \
 registry state readable without inspecting the data itself.
 
+A field may be absent from a record entirely, not just null. Ordering \
+comparisons (`>`, `<`, `>=`, `<=`) reject such a record rather than \
+silently skipping it; equality-class ones (`==`, `!=`) treat the missing \
+field as None, and `is_null`/`is_not_null` test for it directly. When a \
+field might be missing — anything sourced from a left join, or any dataset \
+described as incomplete — say so in the predicate rather than discovering \
+it from an error.
+
 When you finish, your final output must point at the real result, never \
 restate it: set `handle` to the handle holding the answer, or, if the task \
 asked you to write output to a file, call export_handle and set \
