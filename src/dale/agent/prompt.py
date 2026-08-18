@@ -119,6 +119,14 @@ for a human skimming the log — it is not the source of truth for the \
 result, and the invoker will read the handle's real data or the exported \
 file directly, not your note.
 
+If the task cannot be done with the operations and data you have, say so \
+instead of returning a pipeline that does not answer it: set `status` to \
+"blocked" with a `code` — OPERATION_UNAVAILABLE when it needs an operation \
+you were not offered, DATA_INSUFFICIENT when the available handles do not \
+contain what it requires, TASK_UNCLEAR when guessing would be worse than \
+asking — and use `note` to say what specifically was missing. That is a \
+complete, useful answer, not a failure to avoid.
+
 Data currently available to you:
 {registry_state}{privacy_note}"""
 

@@ -16,6 +16,7 @@ from dale.agent import (
     ALL_OPERATIONS,
     CORE_OPERATIONS,
     ActionLog,
+    DaleResult,
     AgentLoopTerminated,
     build_agent,
     build_tools,
@@ -2028,7 +2029,9 @@ def _malformed_then_good_model(*, bad_batches: int) -> tuple[FunctionModel, dict
                     )
                 ]
             )
-        return ModelResponse(parts=[ToolCallPart("final_result", {"note": "done"})])
+        return ModelResponse(
+            parts=[ToolCallPart("final_result", {"handle": "widgets", "note": "done"})]
+        )
 
     return FunctionModel(emit), sent
 
@@ -2635,3 +2638,77 @@ def test_a_multi_step_batch_produces_the_pre_change_trace():
     expected_entries, expected_render = _read_baseline("four_step")
     assert module.normalize_entries(log) == expected_entries
     assert module.normalize_render(log) == expected_render
+
+
+# ---------------------------------------------------------------------------
+# blocked results: the model saying it cannot do the task
+# ---------------------------------------------------------------------------
+
+
+def test_ok_requires_somewhere_for_the_answer_to_live():
+    """The hole this closes: before the validator, a result with neither
+    `handle` nor `exported_to` was valid, run_agent reported success, and the
+    caller's registry.materialize(None) raised HandleNotFoundError *after*
+    their success check had passed."""
+    with pytest.raises(ValidationError):
+        DaleResult(note="I had a lovely time but produced nothing")
+
+
+def test_blocked_requires_a_code():
+    with pytest.raises(ValidationError):
+        DaleResult(status="blocked", note="couldn't do it")
+
+
+def test_blocked_must_not_point_at_a_result():
+    """A run that could not finish has nothing to point at; a blocked result
+    carrying a handle would be exactly the caller trap this validator exists
+    to remove."""
+    with pytest.raises(ValidationError):
+        DaleResult(status="blocked", code="TASK_UNCLEAR", handle="x", note="n")
+
+
+def test_code_is_meaningless_without_blocked():
+    with pytest.raises(ValidationError):
+        DaleResult(handle="x", code="TASK_UNCLEAR", note="n")
+
+
+def test_the_ordinary_result_still_needs_no_status():
+    """status defaults to 'ok', so the common path costs the model nothing to
+    express -- it never writes the field at all."""
+    r = DaleResult(handle="engineering_list", note="done")
+    assert r.status == "ok"
+    assert r.code is None
+
+
+def test_a_blocked_run_is_reported_as_a_failed_run(registry):
+    """Mapped onto `success`, the field every invoker already checks, rather
+    than a second condition they have to know to test."""
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from pydantic_ai.models.function import FunctionModel
+
+    _widget_registry(registry)
+
+    def emit(messages, info) -> ModelResponse:
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    "final_result",
+                    {
+                        "status": "blocked",
+                        "code": "OPERATION_UNAVAILABLE",
+                        "note": "needs join_lookup, which was not offered",
+                    },
+                )
+            ]
+        )
+
+    log = ActionLog()
+    agent = build_agent(registry, log, model=FunctionModel(emit))
+    outcome = run_agent(agent, "do something", deps=registry, action_log=log)
+
+    assert outcome.success is False
+    assert "OPERATION_UNAVAILABLE" in outcome.error
+    assert "join_lookup" in outcome.error
+    # The result is still attached -- a caller wanting the structured reason
+    # should not have to parse it back out of the error string.
+    assert outcome.result.output.code == "OPERATION_UNAVAILABLE"

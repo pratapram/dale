@@ -97,6 +97,53 @@ These are cheap, fast defaults chosen for the examples, not a recommendation for
 to pin anything else. `pick_model()` never reads a key's *value*; presence is the whole test, and
 the provider classes do the authenticating.
 
+## How a run ends, and `DaleResult`
+
+A run ends exactly one of four ways, and only the first is normal:
+
+| exit | who decides | `outcome.success` |
+|---|---|---|
+| the model calls `final_result` with `status="ok"` | the model | `True` |
+| the model calls `final_result` with `status="blocked"` | the model | `False` |
+| `AgentLoopTerminated` — repetition limit or tool-call ceiling | DALE | `False` |
+| `UsageLimitExceeded`, provider error, anything else | pydantic-ai / provider | `False` |
+
+**`success=True` means the loop terminated with a result to point at — not that the result is
+correct.** DALE verifies the *shape* of the final output, never its *content*: nothing compares it
+against the task, and nothing checks that the named handle resolves. Verifying the answer is the
+invoker's job. (This project's own evaluation harness does exactly that: it never reads the model's
+answer text, it inspects registry state against independently-computed ground truth.)
+
+`DaleResult` carries `handle`, `exported_to`, `note`, `status` and `code`, with a validator
+enforcing two mutually exclusive shapes:
+
+- `status="ok"` (the default) **requires** `handle` or `exported_to`. A model cannot claim success
+  while pointing at nothing — that shape fails output validation and pydantic-ai returns it to the
+  model to fix.
+- `status="blocked"` **requires** `code` and forbids both destinations, because a run that could not
+  finish has no result to point at.
+
+`code` is a closed set:
+
+| code | when |
+|---|---|
+| `OPERATION_UNAVAILABLE` | the pipeline needs an operation this session was not offered |
+| `DATA_INSUFFICIENT` | the available handles do not contain what the task requires |
+| `TASK_UNCLEAR` | the request is ambiguous enough that guessing would be worse |
+
+`OPERATION_UNAVAILABLE` is the one obstacle DALE cannot otherwise surface. A withheld operation is
+absent from `run_plan`'s union, so the model cannot name it and no error exists for it to react to —
+without this code, narrowing `operations=` too far shows up only as a worse pipeline. If you see it,
+the fix is to widen the allowlist, and `note` says which operation was missing.
+
+```python
+outcome = run_agent(agent, task, deps=registry, action_log=log)
+if not outcome.success:
+    # covers blocked, guardrail termination and provider errors alike
+    raise SystemExit(outcome.error)
+data = registry.materialize(outcome.result.output.handle)
+```
+
 ## Strict privacy mode
 
 `DataRegistry(privacy_mode=True)` turns on the `strict_privacy` mode (`DESIGN.md`, "Optional

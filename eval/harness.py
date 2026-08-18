@@ -73,6 +73,13 @@ class TrialResult:
     final_answer: str
     action_log: ActionLog
     error: str | None = None
+    blocked_code: str | None = None
+    """Set when the model reported it could not do the task at all
+    (`DaleResult.status == "blocked"`). Distinct from `error`, which means the
+    run broke, and from a plain False `success`, which means it answered
+    wrongly. Without this a declined run is indistinguishable from a wrong one
+    in batch output -- which cost a real wrong conclusion during the change
+    that introduced blocked results."""
     usage: TokenUsage = field(default_factory=TokenUsage)
     wall_clock_s: float = 0.0
 
@@ -177,6 +184,11 @@ class TrialSummary:
             for e in r.action_log.entries:
                 if e.status == "error":
                     counts[e.result.get("code", "UNKNOWN")] += 1
+            # A declined run has no failed *call* to count, so it would
+            # otherwise vanish from this tally entirely -- the one failure mode
+            # that leaves no trace in the action log.
+            if r.blocked_code:
+                counts[f"BLOCKED:{r.blocked_code}"] += 1
         return counts
 
     def render(self, show_action_logs: bool = True) -> str:
@@ -228,7 +240,10 @@ class TrialSummary:
             )
         for r in self.results:
             if not r.success:
-                detail = r.error or "result did not match expected ground truth"
+                if r.blocked_code:
+                    detail = f"BLOCKED {r.blocked_code} — {r.final_answer[:160]}"
+                else:
+                    detail = r.error or "result did not match expected ground truth"
                 lines.append(f"  trial {r.trial} FAILED: {detail}")
         if show_action_logs:
             for r in self.results:
@@ -292,6 +307,9 @@ def run_trial(
         result = agent.run_sync(task, deps=registry, usage=accumulator, usage_limits=usage_limits)
         final_answer = str(result.output)
         success = checker(registry, action_log, final_answer)
+        blocked_code = getattr(result.output, "code", None) if (
+            getattr(result.output, "status", "ok") == "blocked"
+        ) else None
         return TrialResult(
             trial=trial,
             model=model,
@@ -299,6 +317,7 @@ def run_trial(
             success=success,
             final_answer=final_answer,
             action_log=action_log,
+            blocked_code=blocked_code,
             usage=TokenUsage.from_run(accumulator, result.all_messages(), model=agent.model),
             wall_clock_s=time.perf_counter() - started,
         )

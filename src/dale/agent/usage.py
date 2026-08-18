@@ -18,12 +18,32 @@ circular import between this module and the entry points that use all of it.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any, Literal, Sequence
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_ai import AgentRunResult
 
 from dale.agent.log import ActionLog
+
+
+BlockedCode = Literal["OPERATION_UNAVAILABLE", "DATA_INSUFFICIENT", "TASK_UNCLEAR"]
+"""Why a run could not produce a result.
+
+A closed set, not a free string, for the same reason every other part of the
+grammar is closed: the model picks from a fixed vocabulary rather than
+inventing one, and `note` carries the specifics. SCREAMING_SNAKE to match
+`DaleError.code`, which is the vocabulary the model already sees on every
+operation result.
+
+- OPERATION_UNAVAILABLE -- the pipeline needs an operation this session was not
+  offered. The one case DALE cannot otherwise surface at all: a withheld
+  operation is absent from run_plan's union, so the model cannot name it and no
+  error exists to react to. Without this code that gap is invisible, and shows
+  up only as a worse pipeline.
+- DATA_INSUFFICIENT -- the handles available do not contain what the task needs.
+- TASK_UNCLEAR -- the request is ambiguous enough that guessing would be worse
+  than saying so.
+"""
 
 
 class DaleResult(BaseModel):
@@ -49,6 +69,48 @@ class DaleResult(BaseModel):
         description="One short sentence summarizing the result, for a human skimming the "
         "log. Not the data itself — the invoker reads `handle` or `exported_to` for that.",
     )
+    status: Literal["ok", "blocked"] = Field(
+        "ok",
+        description="'ok' when you produced a result; 'blocked' when the task cannot be "
+        "done with what is available.",
+    )
+    code: BlockedCode | None = Field(
+        None, description="Required when status is 'blocked': which kind of obstacle it was."
+    )
+
+    @model_validator(mode="after")
+    def _shape_matches_status(self) -> "DaleResult":
+        """The two shapes are mutually exclusive, and enforcing that here is
+        what makes each one trustworthy to a caller.
+
+        `ok` requiring a destination closes a real hole: before this, a result
+        with neither `handle` nor `exported_to` validated fine, `run_agent`
+        reported success, and the caller's `registry.materialize(None)` raised
+        `HandleNotFoundError` *after* their success check had passed. A model
+        can no longer claim success while pointing at nothing — pydantic-ai
+        sends the output back for it to fix instead.
+
+        `blocked` forbidding a destination is the same rule from the other
+        side: a run that could not finish has nothing to point at, and a
+        blocked result carrying a handle would be a caller trap of exactly the
+        kind this validator exists to remove."""
+        if self.status == "blocked":
+            if self.code is None:
+                raise ValueError("status='blocked' requires `code` to say what the obstacle was")
+            if self.handle or self.exported_to:
+                raise ValueError(
+                    "status='blocked' must not set `handle` or `exported_to` — a run that "
+                    "could not finish has no result to point at"
+                )
+        else:
+            if self.code is not None:
+                raise ValueError("`code` is only meaningful when status='blocked'")
+            if not (self.handle or self.exported_to):
+                raise ValueError(
+                    "status='ok' requires `handle` or `exported_to` — if there is no result, "
+                    "set status='blocked' with a `code` instead of returning an empty success"
+                )
+        return self
 
 
 def _is_synthetic_model(model: Any) -> bool:
