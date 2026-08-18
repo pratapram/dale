@@ -15,6 +15,7 @@ from dale.operations import (  # noqa: F401
     io,
     join,
     lifecycle,
+    reduce,
     sort,
     window,
 )

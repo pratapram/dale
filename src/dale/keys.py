@@ -20,7 +20,7 @@ def require_dict_handle(
     if meta.type != "dict":
         raise TypeMismatchError(
             f"{operation} {param} must be a dict handle (built via index_by/group_by/"
-            f"priority_reduce), got {meta.type!r}",
+            f"reduce_by), got {meta.type!r}",
             details={"handle": handle, "param": param, "type": meta.type},
         )
     return meta
@@ -33,7 +33,7 @@ def require_record_valued(
     needs to read fields off them.
 
     The check `require_dict_handle` alone does not cover: `index_by` and
-    `priority_reduce` both produce dicts with value_shape="one", but the
+    `reduce_by` both produce dicts with value_shape="one", but the
     former's values are records and the latter's are single field values.
     Reading a field off the latter used to raise a bare Python TypeError
     inside join_lookup, which dispatch sanitized into an unactionable
@@ -43,7 +43,7 @@ def require_record_valued(
     if meta.element_type == "value":
         raise TypeMismatchError(
             f"{operation} {param} {handle!r} holds single values, not records — "
-            "its values came from something like priority_reduce, so there are no "
+            "its values came from something like reduce_by with a value_field, so there are no "
             "fields to read off them. Use an index built by index_by or group_by, "
             "or name exactly one target field to bind the value to.",
             details={"handle": handle, "param": param, "element_type": meta.element_type},

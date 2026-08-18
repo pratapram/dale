@@ -74,7 +74,7 @@ Rather than academic contest puzzles, the single agent orchestrator manages full
 
 ### Use Case 6: License/Entitlement Tier Reconciliation with Incremental Diff
 * **Scenario:** The project's original motivating problem. Three per-tier eligibility lists (e.g. gold/silver/bronze) arrive as separate JSON files on an hourly cadence; a user appearing on more than one list must be resolved to the single highest tier, and the result must be diffed against the *previous* hour's assignment to find joins, leaves, upgrades, and downgrades.  
-* **Pipeline:** Load each tier list (→ `load_json`) → union the lists into one candidate set tagged by source tier → resolve each user to a single tier via priority order (gold > silver > bronze, `resolve_priority`) → diff the resolved assignment against the prior run's snapshot (`dict_diff`) → export new/removed/changed assignments. Exercises the "hash map + priority-ordered reduction" family in the Layer 2 mapping table below.
+* **Pipeline:** Load each tier list (→ `load_json`) → union the lists into one candidate set tagged by source tier → resolve each user to a single tier via priority order (gold > silver > bronze, `reduce_by`) → diff the resolved assignment against the prior run's snapshot (`dict_diff`) → export new/removed/changed assignments. Exercises the "duplicate-key resolution" family in the Layer 2 mapping table below.
 
 ### Use Case 7: Nested/Wrapped Enterprise API Response Normalization
 * **Scenario:** JSON responses from enterprise APIs (Salesforce SOQL relationship queries, ServiceNow Table API reference fields, Shopify orders/line items, GitHub issues/labels, Jira custom fields) arrive envelope-wrapped (`{"records": [...]}`, `{"result": [...]}`, `{"data": [...]}`) and nested, not flat — the API-integration analog of Use Case 1's file-based reconciliation. Pagination is explicitly out of scope; the invoker is assumed to have already fetched and assembled one complete document before it reaches DALE.  
@@ -96,7 +96,7 @@ Build status below reflects the current catalog; the operation table in
 
 | Enterprise Use Case | CS Paradigm / Mechanism | Required Operations |
 | :---- | :---- | :---- |
-| **Hierarchical Deduplication** | Hash Maps + Priority Ordering | `priority_reduce` (built) — reduces a group of duplicate records to one via priority order. Exercised by Use Case 6 |
+| **Duplicate-Key Resolution** | Hash Maps + Group-wise Argmax | `reduce_by` (built) — keeps one record per key, the first under a stated ordering: a field's own values, or an explicit ranking of them. Exercised by Use Case 6 |
 | **Log Stream Sessionization** | Sliding Window / Two-Pointer | `window_flag` |
 | **Effective Access Resolution** | Adjacency Graph Traversal | `graph_walk_resolve` (built — a bounded single-parent walk, not general traversal); `graph_bfs`/`graph_dfs`/`graph_topological_sort` remain unbuilt and are not required by any current use case |
 | **Feature Usage Aggregation** | Frequency Maps + Set Difference | `dict_frequency`, `set_difference` (unbuilt — `group_by` + `join_lookup` + `filter_where` is a working alternative pipeline for this specific case, see `examples/data/README.md`) |

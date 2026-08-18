@@ -32,7 +32,7 @@ def _status(key: Any, current: dict, previous: dict) -> str:
 
 @operation("dict_diff", DictDiffParams, bounded_by_input=True, creates_handle=True)
 def dict_diff(registry: DataRegistry, params: DictDiffParams) -> OperationOutput:
-    """Compare two dict handles (any two — priority_reduce's output, a plain
+    """Compare two dict handles (any two — reduce_by's output, a plain
     load_json dict, anything keyed the same way) and return a new list
     handle, one row per key across the union of both, each tagged "new"/
     "removed"/"changed"/"unchanged". All four statuses are always included,

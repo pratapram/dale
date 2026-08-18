@@ -47,7 +47,7 @@ Not part of the `dale` package — this project's own research-validation toolin
   model received `{"message": "operation execution failed", "details": {}}` and had nothing to act
   on. **Treat every `INTERNAL_ERROR` in a trial as a DALE defect to file, never as a model
   failure** — an `INTERNAL_ERROR` always means a missing precondition. One such bug
-  (`join_lookup` on a `priority_reduce` index) was found exactly this way, from a single
+  (`join_lookup` on a value-valued `reduce_by` index) was found exactly this way, from a single
   `failure modes: INTERNAL_ERROR=1` line in a `uc3_large` run.
 
   Prints progress live by default (`verbose=True`, mapped internally to `dale.agent`'s

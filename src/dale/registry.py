@@ -59,11 +59,11 @@ class DataHandle(BaseModel):
     element_type: ElementType | None = None
     """For a dict handle, whether its values are whole records or bare
     single values — `"record"` for index_by/group_by, `"value"` for
-    priority_reduce. Deliberately separate from `value_shape`, which states
+    reduce_by. Deliberately separate from `value_shape`, which states
     *arity* (one value per key vs a list of them) and nothing about type:
-    index_by and priority_reduce both declare value_shape="one" while
+    index_by and reduce_by both declare value_shape="one" while
     holding completely different things, and join_lookup once read that
-    field as if it implied "record", crashing on a priority_reduce index
+    field as if it implied "record", crashing on a reduce_by index
     (an `INTERNAL_ERROR` always means a missing precondition).
 
     Inferred by create() from the same sample it already takes for
