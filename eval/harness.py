@@ -265,6 +265,7 @@ def run_trial(
     max_steps_per_call: int | None = None,
     usage_limits: Any | None = None,
     operations: Any = ALL_OPERATIONS,
+    privacy_mode: bool = False,
 ) -> TrialResult:
     """`max_steps_per_call=1` runs the same use case one operation per round
     trip — paired with TokenUsage.requests, that's paper.md Section 4.2 part
@@ -276,7 +277,7 @@ def run_trial(
     `usage_limits` is forwarded to run_sync (a pydantic_ai.usage.UsageLimits).
     pydantic-ai already applies request_limit=50 when none is given; passing
     one explicitly is how a live batch caps its own spend."""
-    registry = dale.DataRegistry(files=dale.FileRegistry())
+    registry = dale.DataRegistry(files=dale.FileRegistry(), privacy_mode=privacy_mode)
     setup(registry)
     action_log = ActionLog()
     action_log.seed_from_registry(registry)
@@ -347,6 +348,7 @@ def run_trials(
     max_steps_per_call: int | None = None,
     usage_limits: Any | None = None,
     operations: Any = ALL_OPERATIONS,
+    privacy_mode: bool = False,
 ) -> TrialSummary:
     """Prints progress at two levels, both flushed immediately rather than
     buffered until the whole batch finishes: per-trial start/elapsed-time
@@ -376,6 +378,7 @@ def run_trials(
             max_steps_per_call=max_steps_per_call,
             usage_limits=usage_limits,
             operations=operations,
+            privacy_mode=privacy_mode,
         )
         elapsed = time.monotonic() - start
         outcome = "ok" if result.success else "FAILED"

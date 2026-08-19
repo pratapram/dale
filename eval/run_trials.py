@@ -49,6 +49,13 @@ def main() -> None:
         help="cap steps per turn; 1 is the unbatched condition (Section 4.2 part F)",
     )
     parser.add_argument(
+        "--privacy",
+        action="store_true",
+        help="run under privacy_mode: no peek block in the prompt, peek withheld as an "
+        "operation, describe's categorical values redacted. Tests whether a use case "
+        "needs data values or only schema.",
+    )
+    parser.add_argument(
         "--operations",
         default=None,
         metavar="LIST",
@@ -103,6 +110,7 @@ def main() -> None:
         max_steps_per_call=args.steps_per_call,
         usage_limits=usage_limits,
         operations=operations,
+        privacy_mode=args.privacy,
     )
     print(summary.render())
 

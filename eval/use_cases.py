@@ -435,6 +435,53 @@ def check_uc4(registry: dale.DataRegistry, action_log: ActionLog, final_answer: 
     return False
 
 
+# --- Use Case 9: value discovery (inconsistent categorical encoding) ------
+#
+# The one use case here that CANNOT be solved from schema alone. Every other
+# task in this file names its fields and business rules upfront, so a correct
+# pipeline is composable without ever seeing a data value -- which is exactly
+# why they all pass under privacy_mode. This one requires learning *which
+# values* a field actually contains, so it is the deliberate test of the
+# tradeoff privacy_mode makes rather than another instance of the regime that
+# tradeoff is free in.
+#
+# The status column carries four spellings of "cancelled" (`cancelled`,
+# `canceled`, `CANCELLED`, `cxl`) written by three notional systems over the
+# years. The task says variants exist -- withholding that would make it a trick
+# question rather than a discovery task -- but does not say what they are.
+
+
+def setup_uc9(registry: dale.DataRegistry) -> None:
+    base = DATA_DIR / "09_status_normalization"
+    _load(registry, base / "accounts.csv")
+
+
+TASK_UC9 = (
+    "You have an accounts dataset with an account ID, company name, status, and "
+    "monthly recurring revenue. The status field has been populated by three "
+    "different systems over the years, so the same status can appear under more "
+    "than one spelling. Find every cancelled account and tell me which accounts "
+    "they are. Do not include accounts that are merely paused or on trial."
+)
+
+# Ground truth by construction, from the fixture: 11 of 30 accounts are
+# cancelled across the four spellings. A pipeline that only matches the exact
+# string "cancelled" finds 4 -- the failure this use case exists to detect.
+_UC9_EXPECTED_IDS = {
+    "ACC-102", "ACC-104", "ACC-106", "ACC-108", "ACC-110", "ACC-113",
+    "ACC-116", "ACC-118", "ACC-120", "ACC-122", "ACC-125",
+}
+_UC9_EXPECTED_MRR = 13_150
+
+
+def check_uc9(registry: dale.DataRegistry, action_log: ActionLog, final_answer: str) -> bool:
+    """Exact set match, as everywhere else here. Partial credit would defeat
+    the point: finding 4 of 11 is the *characteristic* failure of solving this
+    from schema alone, and a checker that accepted it would report the
+    experiment's negative result as a pass."""
+    return _answer_matches(registry, _UC9_EXPECTED_IDS, "account_id")
+
+
 USE_CASES = {
     "uc1": (setup_uc1, TASK_UC1, check_uc1),
     "uc2": (setup_uc2, TASK_UC2, check_uc2),
@@ -443,6 +490,7 @@ USE_CASES = {
     # scale comparison, not a new reasoning problem.
     "uc3_large": (setup_uc3_large, TASK_UC3, check_uc3_large),
     "uc4": (setup_uc4, TASK_UC4, check_uc4),
+    "uc9": (setup_uc9, TASK_UC9, check_uc9),
 }
 
 
@@ -525,4 +573,8 @@ EXPECTED_ANSWERS: dict[str, Callable[[], ExpectedAnswer]] = {
     "uc3": lambda: ExpectedAnswer(kind="id_set", value=_UC3_EXPECTED),
     "uc3_large": lambda: ExpectedAnswer(kind="id_set", value=set(_UC3_LARGE_EXPECTED)),
     "uc4": lambda: ExpectedAnswer(kind="mapping", value=_UC4_EXPECTED),
+    # The baseline arm sees every row in its prompt, so the four spellings are
+    # plainly visible to it -- this use case is hard for a *schema-only* reader,
+    # not for one holding the data. That asymmetry is the point of measuring it.
+    "uc9": lambda: ExpectedAnswer(kind="id_set", value=set(_UC9_EXPECTED_IDS)),
 }

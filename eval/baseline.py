@@ -384,11 +384,19 @@ def measure_tokens(
 # --- the two arms ----------------------------------------------------------
 
 
-def fresh_registry(use_case: str) -> dale.DataRegistry:
+def fresh_registry(use_case: str, *, privacy_mode: bool = False) -> dale.DataRegistry:
     """A registry with the use case's `setup()` applied — the same starting
-    state a real trial gets, built the same way eval.harness builds it."""
+    state a real trial gets, built the same way eval.harness builds it.
+
+    `privacy_mode` matters for part (C) specifically. Under the default, the
+    system prompt carries peek_at_every_step's initial peek/describe block,
+    which contains *real sample records* -- so a flat-context measurement taken
+    there is a claim about size, not about data exposure. privacy_mode drops
+    that block (and withholds `peek` as a step at all), which is what makes
+    "no data value reaches the model" a measurable property rather than a
+    description of intent."""
     setup, _, _ = USE_CASES[use_case]
-    registry = dale.DataRegistry(files=dale.FileRegistry())
+    registry = dale.DataRegistry(files=dale.FileRegistry(), privacy_mode=privacy_mode)
     setup(registry)
     return registry
 
@@ -496,7 +504,12 @@ class ArmCounts:
 
 
 def count_arms(
-    use_case: str, counter: TokenCounter, *, fmt: str = "csv", model: str | None = None
+    use_case: str,
+    counter: TokenCounter,
+    *,
+    fmt: str = "csv",
+    model: str | None = None,
+    privacy_mode: bool = False,
 ) -> ArmCounts:
     """Count both arms for one use case.
 
@@ -518,7 +531,10 @@ def count_arms(
     prompt = build_baseline_prompt(baseline_registry, task, fmt=fmt)
     baseline = measure_tokens(counter, user_text=prompt)
 
-    dale_registry = fresh_registry(use_case)
+    # Only the DALE arm takes privacy_mode: the baseline arm's whole premise is
+    # that the data is in the prompt, so a "private" baseline is not a thing
+    # that exists -- that asymmetry is the finding, not an oversight.
+    dale_registry = fresh_registry(use_case, privacy_mode=privacy_mode)
     system = default_system_prompt(dale_registry)
     schemas = tool_schemas(dale_registry)
     with_tools = measure_tokens(counter, user_text=task, system=system, tools=schemas)
