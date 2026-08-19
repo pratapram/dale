@@ -1,0 +1,31 @@
+account_id,company,status,mrr
+ACC-101,Acme Corp,active,1200
+ACC-102,Globex,cancelled,450
+ACC-103,Initech,active,800
+ACC-104,Umbrella,canceled,300
+ACC-105,Soylent,trial,0
+ACC-106,Hooli,CANCELLED,2100
+ACC-107,Vehement,active,1500
+ACC-108,Massive Dynamic,cxl,675
+ACC-109,Stark Industries,active,3200
+ACC-110,Wayne Enterprises,cancelled,900
+ACC-111,Cyberdyne,paused,550
+ACC-112,Tyrell,active,1100
+ACC-113,Weyland,canceled,1750
+ACC-114,Aperture,trial,0
+ACC-115,Black Mesa,active,2400
+ACC-116,Oscorp,CANCELLED,1300
+ACC-117,Abstergo,active,700
+ACC-118,Virtucon,cancelled,225
+ACC-119,Gringotts,trial,0
+ACC-120,Duff Brewing,cxl,1050
+ACC-121,Prestige Worldwide,active,600
+ACC-122,Sterling Cooper,canceled,2800
+ACC-123,Dunder Mifflin,paused,400
+ACC-124,Pied Piper,active,950
+ACC-125,Hanso Foundation,cancelled,1600
+ACC-126,Nakatomi,trial,0
+ACC-127,Rekall,active,1850
+ACC-128,Omni Consumer,active,2250
+ACC-129,Xanatos Enterprises,trial,0
+ACC-130,Zorg Industries,active,1400

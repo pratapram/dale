@@ -67,6 +67,12 @@ def main() -> None:
     )
     parser.add_argument("n", nargs="?", type=int, default=1, help="trials for --run (default 1)")
     parser.add_argument("--format", choices=FORMATS, default="csv", help="baseline serialization")
+    parser.add_argument(
+        "--privacy",
+        action="store_true",
+        help="count DALE's arm under privacy_mode — drops the auto-inspect peek block, so "
+        "no real data value appears in the prompt at all (part (C)'s stronger claim)",
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--count-only",
@@ -95,7 +101,15 @@ def main() -> None:
 
     counter = AnthropicTokenCounter(args.model)
     print(f"Counting context for {args.use_case} against {args.model}...\n", flush=True)
-    print(count_arms(args.use_case, counter, fmt=args.format, model=args.model).render())
+    print(
+            count_arms(
+                args.use_case,
+                counter,
+                fmt=args.format,
+                model=args.model,
+                privacy_mode=args.privacy,
+            ).render()
+        )
 
     if not args.run:
         return
